@@ -9,6 +9,7 @@ services:
       # Optional: Mount config externally if you want to edit it without rebuilding
       - ./config.json:/app/config.json:ro
       - ./logs:/app/logs
+      - ./logs/matcharr-cron.log:/var/log/matcharr.log
     environment:
       - TZ=America/New_York
       - CRON_SCHEDULE=0 2 * * *
