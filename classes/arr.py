@@ -9,6 +9,5 @@ class Arr:
         self.data = json.loads(r.text)
 
         # Get the actual paths for each media item
-        self.paths = []
-        for item in self.data:
-            self.paths.append(item["path"])
+        # The API returns a list of objects, each with a 'path' field
+        self.paths = [item.get("path") for item in self.data if item.get("path")]
