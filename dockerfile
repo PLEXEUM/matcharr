@@ -17,26 +17,28 @@ COPY *.py ./
 COPY classes/ ./classes/
 COPY utils/ ./utils/
 
+# Create startup script with proper line endings
+RUN printf '#!/bin/bash\n' > /startup.sh && \
+    printf 'echo "Matcharr container started. Waiting for cron schedule..."\n' >> /startup.sh && \
+    printf 'echo "Cron schedule: $CRON_SCHEDULE"\n' >> /startup.sh && \
+    printf 'echo "Logs will appear in /var/log/matcharr.log"\n' >> /startup.sh && \
+    printf 'cron -f\n' >> /startup.sh && \
+    chmod +x /startup.sh
+
 # Create cron script
-RUN echo "#!/bin/bash" > /run-cron.sh
-RUN echo "echo 'Running Matcharr at $(date)' >> /var/log/matcharr.log" >> /run-cron.sh
-RUN echo "cd /app && python app.py >> /var/log/matcharr.log 2>&1" >> /run-cron.sh
-RUN echo "echo 'Matcharr completed at $(date)' >> /var/log/matcharr.log" >> /run-cron.sh
-RUN chmod +x /run-cron.sh
+RUN printf '#!/bin/bash\n' > /run-cron.sh && \
+    printf 'echo "Running Matcharr at $(date)" >> /var/log/matcharr.log\n' >> /run-cron.sh && \
+    printf 'cd /app && python app.py >> /var/log/matcharr.log 2>&1\n' >> /run-cron.sh && \
+    printf 'echo "Matcharr completed at $(date)" >> /var/log/matcharr.log\n' >> /run-cron.sh && \
+    chmod +x /run-cron.sh
 
 # Setup cron
-RUN echo "SHELL=/bin/bash" > /etc/cron.d/matcharr
-RUN echo "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >> /etc/cron.d/matcharr
-RUN echo "$CRON_SCHEDULE root /run-cron.sh" >> /etc/cron.d/matcharr
+RUN printf 'SHELL=/bin/bash\n' > /etc/cron.d/matcharr && \
+    printf 'PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n' >> /etc/cron.d/matcharr && \
+    printf '%s root /run-cron.sh\n' "$CRON_SCHEDULE" >> /etc/cron.d/matcharr && \
+    chmod 0644 /etc/cron.d/matcharr
 
 # Create log file
 RUN touch /var/log/matcharr.log
-
-# Print startup message to Docker logs
-RUN echo "echo 'Matcharr container started. Waiting for cron schedule...'" > /startup.sh
-RUN echo "echo 'Cron schedule: $CRON_SCHEDULE'" >> /startup.sh
-RUN echo "echo 'Logs will appear in /var/log/matcharr.log'" >> /startup.sh
-RUN echo "cron -f" >> /startup.sh
-RUN chmod +x /startup.sh
 
 CMD ["/startup.sh"]
