@@ -54,12 +54,12 @@ def arr_find_plex_id(arrpaths, arr_plex_match, plex_library_paths, plex_sections
         for arr in arrpaths[arrtype].keys():
             arr_plex_match[arrtype][arr] = {}
             for arr_path in arrpaths[arrtype][arr].values():
-                # Normalize path for comparison
-                arr_path_normalized = arr_path.replace('\\', '/').rstrip('/')
+                # Map the arr_path to container path FIRST
+                arr_path_mapped = map_path(config, arr_path).replace('\\', '/').rstrip('/')
                 for library in plex_library_paths.keys():
                     for plex_path in plex_library_paths[library].values():
                         plex_path_normalized = map_path(config, posixpath.join(plex_path, '')).replace('\\', '/').rstrip('/')
-                        if arr_path_normalized == plex_path_normalized:
+                        if arr_path_mapped.startswith(plex_path_normalized):
                             arr_plex_match[arrtype][arr][arr_path] = {"plex_library_id": library}
                             plex_sections[library] = library
 
