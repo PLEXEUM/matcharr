@@ -6,6 +6,7 @@ libraries in Plex/Emby and fixes any mismatches created by the agents used.
 import json
 import time
 import sys
+import logging
 import pkg_resources
 
 from plexapi.server import PlexServer
@@ -17,27 +18,40 @@ from utils.arr import parse_arr_data, get_arrpaths, check_faulty
 from utils.base import timeoutput, giefbar
 from utils.logging import get_logger
 
-# TODO add logging
-#  add validation for Arr/Plex/Emby config entries
-#  add check for empty libraries in Plex/Emby
-#  add support for anime (tentative)
-#  add support for multiple Plex/Emby instances (tentative)
-#  add support for forcing an agent for library types
-#  add dry-run option
-#  add support for specifying path mapping for media server
+# Setup logging
+logger = get_logger(__name__)
+
+# Redirect stdout and stderr to logger
+class LoggerWriter:
+    def __init__(self, logger, level):
+        self.logger = logger
+        self.level = level
+
+    def write(self, message):
+        if message.strip():
+            self.logger.log(self.level, message.strip())
+
+    def flush(self):
+        pass
+
+sys.stdout = LoggerWriter(logger, logging.INFO)
+sys.stderr = LoggerWriter(logger, logging.ERROR)
 
 runtime = time.time()
 
-# Logging
-logger = get_logger(__name__)
-logger.info("Running Matcharr.")
-logger.debug("Using PlexAPI version %s", pkg_resources.get_distribution("plexapi").version)
-logger.debug("Using requests version %s", pkg_resources.get_distribution("requests").version)
-logger.debug("Using pandas version %s", pkg_resources.get_distribution("pandas").version)
-logger.debug("Using tqdm version %s", pkg_resources.get_distribution("tqdm").version)
+# Log startup
+logger.info("="*60)
+logger.info("Matcharr Started")
+logger.info("="*60)
 
 # Load configuration
 config = json.load(open("config.json"))
+
+# Log path mappings
+logger.info(f"Config loaded with {len(config['path_mappings'])} path mappings")
+for source, dest in config['path_mappings'].items():
+    logger.info(f"  {source} -> {dest}")
+
 sonarr_config = config["sonarr"].keys()
 logger.debug("Sonarr config: %s", sonarr_config)
 radarr_config = config["radarr"].keys()
@@ -57,7 +71,7 @@ for radarr in radarr_config:
     radarrs_config[radarr] = config["radarr"][radarr]
 
 if not bool(radarrs_config.keys()) and not bool(sonarrs_config.keys()):
-    print(f'{timeoutput()} - No Arrs configured - Exiting.')
+    logger.error("No Arrs configured - Exiting.")
     sys.exit(0)
 
 # Load data from Arr instances.
@@ -122,7 +136,7 @@ if plex_enabled:
                                              plexlibrary,
                                              config,
                                              delay)
-    print(f"{timeoutput()} - Number of fixed matches in Plex: {PLEX_FIXED_MATCHES}")
+    logger.info(f"Number of fixed matches in Plex: {PLEX_FIXED_MATCHES}")
 
 if emby_enabled:
     # Load data from Emby.
@@ -140,8 +154,24 @@ if emby_enabled:
                                              radarr_items,
                                              embylibrary,
                                              config)
-    print(f"{timeoutput()} - Number of fixed matches in Emby: {EMBY_FIXED_MATCHES}")
+    logger.info(f"Number of fixed matches in Emby: {EMBY_FIXED_MATCHES}")
 
-print(f"{timeoutput()} - Running the program took {round(time.time() - runtime, 2)} seconds.")
+# Final summary
+logger.info("="*60)
+logger.info("SCAN COMPLETE")
+logger.info("="*60)
+
+if plex_enabled:
+    logger.info(f"Plex movies checked: {len(plexlibrary.get(5, []))}")
+    logger.info(f"Plex TV shows checked: {len(plexlibrary.get(2, []))}")
+    logger.info(f"Total fixes applied: {PLEX_FIXED_MATCHES}")
+
+if emby_enabled:
+    logger.info(f"Emby fixes applied: {EMBY_FIXED_MATCHES}")
+
+logger.info(f"Sonarr instances: {len(sonarrs_config)}")
+logger.info(f"Radarr instances: {len(radarrs_config)}")
+logger.info(f"Total run time: {round(time.time() - runtime, 2)} seconds")
+logger.info("="*60)
 
 sys.exit(0)

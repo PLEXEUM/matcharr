@@ -8,6 +8,10 @@ from plexapi.video import Show
 from plexapi.video import Movie
 from classes.plex import Plex
 from utils.base import timeoutput, giefbar, tqdm, map_path
+from utils.logging import get_logger
+
+# Setup logger
+logger = get_logger(__name__)
 
 
 def load_plex_data(server, plex_sections, plexlibrary, config):
@@ -59,41 +63,74 @@ def arr_find_plex_id(arrpaths, arr_plex_match, plex_library_paths, plex_sections
 
 def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
     counter = 0
+    total_compared = 0
+    total_matched = 0
+    total_skipped = 0
+    mismatches_found = []
+
+    logger.info("-" * 60)
+    logger.info("Starting Plex comparison")
+    logger.info("-" * 60)
+
     for arrtype in arr_plex_match.keys():
         if arrtype == "radarr":
             agent = "themoviedb"
             arr = radarr
+            media_type = "Movie"
         elif arrtype == "sonarr":
             agent = "thetvdb"
             arr = sonarr
+            media_type = "TV Show"
+
         for arrinstance in arr_plex_match[arrtype].keys():
             if len(arrinstance) == 0:
                 continue
+
+            logger.info(f"Checking {media_type}s from {arrinstance}")
+
             for folder in arr_plex_match[arrtype][arrinstance].values():
-                for items in giefbar(arr[arrinstance], f'{timeoutput()} - Checking Plex against {arrinstance}'):
+                for items in giefbar(arr[arrinstance], f'{timeoutput()} - Processing {media_type}s'):
+                    total_compared += 1
+                    matched = False
+                    skipped = False
+
+                    # Log progress every 100 items
+                    if total_compared % 100 == 0:
+                        logger.info(f"Progress: {total_compared} items checked")
+
                     for plex_items in library[folder.get("plex_library_id")]:
                         if items.mappedpath in [posixpath.dirname(plex_items.mappedpath), plex_items.mappedpath]:
                             if plex_items.agent == "imdb":
                                 if items.imdb == plex_items.id:
+                                    matched = True
+                                    total_matched += 1
                                     break
-                                tqdm.write(
-                                    f"{timeoutput()} - Plex metadata item {plex_items.metadataid} with imdb ID:{plex_items.id} did not match {arrinstance} imdb ID:{items.imdb}")
-                                tqdm.write(
-                                    f"{timeoutput()} - Path: {items.mappedpath}")
+                                else:
+                                    mismatches_found.append({
+                                        "title": items.title,
+                                        "media_type": media_type,
+                                        "arr_instance": arrinstance,
+                                        "arr_id": items.imdb,
+                                        "plex_id": plex_items.id,
+                                        "path": items.mappedpath
+                                    })
+                                    logger.warning(f"MISMATCH: {items.title}")
+                                    logger.warning(f"  IMDB ID: {items.imdb} vs Plex ID: {plex_items.id}")
+                                    logger.warning(f"  Path: {items.mappedpath}")
 
-                                try:
-                                    plex_match(config["plex_url"],
-                                               config["plex_token"],
-                                               "imdb",
-                                               plex_items.metadataid,
-                                               items.imdb,
-                                               items.title,
-                                               delay)
-
-                                    time.sleep(delay)
-                                except TypeError:
-                                    tqdm.write(f"{timeoutput()} - Plex metadata ID appears to be missing.")
-                                counter += 1
+                                    try:
+                                        plex_match(config["plex_url"],
+                                                   config["plex_token"],
+                                                   "imdb",
+                                                   plex_items.metadataid,
+                                                   items.imdb,
+                                                   items.title,
+                                                   delay)
+                                        counter += 1
+                                        time.sleep(delay)
+                                    except TypeError:
+                                        logger.error(f"Plex metadata ID appears to be missing for {items.title}")
+                                    break
 
                             elif plex_items.agent == "plex":
                                 match_found = 0
@@ -103,10 +140,18 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                                             match_found = 1
                                             break
                                     if not match_found:
-                                        tqdm.write(
-                                            f"{timeoutput()} - Plex metadata item {plex_items.metadataid} with tmdb ID:{plex_items.tmdb} did not match {arrinstance} tmdb ID:{items.id}")
-                                        tqdm.write(
-                                            f"{timeoutput()} - Path: {items.mappedpath}")
+                                        mismatches_found.append({
+                                            "title": items.title,
+                                            "media_type": media_type,
+                                            "arr_instance": arrinstance,
+                                            "arr_id": items.id,
+                                            "plex_id": plex_items.tmdb,
+                                            "path": items.mappedpath
+                                        })
+                                        logger.warning(f"MISMATCH: {items.title}")
+                                        logger.warning(f"  TMDB ID: {items.id} vs Plex ID: {plex_items.tmdb}")
+                                        logger.warning(f"  Path: {items.mappedpath}")
+
                                         try:
                                             plex_match(config["plex_url"],
                                                        config["plex_token"],
@@ -115,21 +160,28 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                                                        items.id,
                                                        items.title,
                                                        delay)
-
+                                            counter += 1
                                             time.sleep(delay)
                                         except TypeError:
-                                            tqdm.write(f"{timeoutput()} - Plex metadata ID appears to be missing.")
-                                        counter += 1
+                                            logger.error(f"Plex metadata ID appears to be missing for {items.title}")
                                 elif arrtype == "sonarr":
                                     for tvdbid in plex_items.tvdb:
                                         if items.id == tvdbid:
                                             match_found = 1
                                             break
                                     if not match_found:
-                                        tqdm.write(
-                                            f"{timeoutput()} - Plex metadata item {plex_items.metadataid} with tvdb ID:{plex_items.tvdb} did not match {arrinstance} tvdb ID:{items.id}")
-                                        tqdm.write(
-                                            f"{timeoutput()} - Path: {items.mappedpath}")
+                                        mismatches_found.append({
+                                            "title": items.title,
+                                            "media_type": media_type,
+                                            "arr_instance": arrinstance,
+                                            "arr_id": items.id,
+                                            "plex_id": plex_items.tvdb,
+                                            "path": items.mappedpath
+                                        })
+                                        logger.warning(f"MISMATCH: {items.title}")
+                                        logger.warning(f"  TVDB ID: {items.id} vs Plex ID: {plex_items.tvdb}")
+                                        logger.warning(f"  Path: {items.mappedpath}")
+
                                         try:
                                             plex_match(config["plex_url"],
                                                        config["plex_token"],
@@ -138,31 +190,67 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                                                        items.id,
                                                        items.title,
                                                        delay)
-
+                                            counter += 1
                                             time.sleep(delay)
                                         except TypeError:
-                                            tqdm.write(f"{timeoutput()} - Plex metadata ID appears to be missing.")
-                                        counter += 1
+                                            logger.error(f"Plex metadata ID appears to be missing for {items.title}")
+                                break
 
                             else:
                                 if items.id == plex_items.id:
+                                    matched = True
+                                    total_matched += 1
                                     break
-                                tqdm.write(f"{timeoutput()} - Plex metadata item {plex_items.metadataid} with {agent} ID:{plex_items.id} did not match {arrinstance} {agent} ID:{items.id}")
-                                tqdm.write(f"{timeoutput()} - Path: {items.mappedpath}")
-                                try:
-                                    plex_match(config["plex_url"],
-                                               config["plex_token"],
-                                               agent,
-                                               plex_items.metadataid,
-                                               items.id,
-                                               items.title,
-                                               delay)
+                                else:
+                                    mismatches_found.append({
+                                        "title": items.title,
+                                        "media_type": media_type,
+                                        "arr_instance": arrinstance,
+                                        "arr_id": items.id,
+                                        "plex_id": plex_items.id,
+                                        "path": items.mappedpath
+                                    })
+                                    logger.warning(f"MISMATCH: {items.title}")
+                                    logger.warning(f"  {agent} ID: {items.id} vs Plex ID: {plex_items.id}")
+                                    logger.warning(f"  Path: {items.mappedpath}")
 
-                                    time.sleep(delay)
-                                except TypeError:
-                                    tqdm.write(f"{timeoutput()} - Plex metadata ID appears to be missing.")
-                                counter += 1
-                                break
+                                    try:
+                                        plex_match(config["plex_url"],
+                                                   config["plex_token"],
+                                                   agent,
+                                                   plex_items.metadataid,
+                                                   items.id,
+                                                   items.title,
+                                                   delay)
+                                        counter += 1
+                                        time.sleep(delay)
+                                    except TypeError:
+                                        logger.error(f"Plex metadata ID appears to be missing for {items.title}")
+                                    break
+
+    # Print final summary
+    logger.info("-" * 60)
+    logger.info("PLEX COMPARISON COMPLETE")
+    logger.info("-" * 60)
+    logger.info(f"Total items compared: {total_compared}")
+    logger.info(f"Items already matched: {total_matched}")
+    logger.info(f"Items fixed: {counter}")
+    logger.info(f"Items skipped (no path match): {total_skipped}")
+    logger.info(f"Mismatches detected: {len(mismatches_found)}")
+
+    if mismatches_found:
+        logger.info("-" * 60)
+        logger.info("MISMATCH DETAILS (First 20)")
+        logger.info("-" * 60)
+        for i, mismatch in enumerate(mismatches_found[:20]):
+            logger.info(f"{i+1}. {mismatch['media_type']}: {mismatch['title']}")
+            logger.info(f"   Arr ID: {mismatch['arr_id']} | Plex ID: {mismatch['plex_id']}")
+            logger.info(f"   Path: {mismatch['path']}")
+        if len(mismatches_found) > 20:
+            logger.info(f"   ... and {len(mismatches_found) - 20} more mismatches")
+
+    logger.info("-" * 60)
+
     return counter
 
 
@@ -188,26 +276,24 @@ def plex_match(url, token, agent, metadataid, agentid, title, delay):
             resp = requests.put(url_str, params=url_params, timeout=30)
 
             if resp.status_code == 200:
-                tqdm.write(f"{timeoutput()} - Successfully matched {int(metadataid)} to {title} ({agentid})")
+                logger.info(f"Successfully matched {int(metadataid)} to {title} ({agentid})")
             else:
-                tqdm.write(
-                    f"{timeoutput()} - Failed to match {int(metadataid)} to {title} ({agentid}) - Plex returned error: {resp.text}")
+                logger.error(f"Failed to match {int(metadataid)} to {title} ({agentid}) - Plex returned error: {resp.text}")
             break
         except (requests.exceptions.Timeout, requests.exceptions.ConnectTimeout):
-            tqdm.write(
-                f"{timeoutput()} - Exception matching {int(metadataid)} to {title} ({agentid}) - {retries} left.")
+            logger.warning(f"Exception matching {int(metadataid)} to {title} ({agentid}) - {retries} left.")
             retries -= 1
             time.sleep(delay)
     if retries == 0:
         raise Exception(
-            f"{timeoutput()} - Exception matching {int(metadataid)} to {title} ({agentid}) - Ran out of retries.")
+            f"Exception matching {int(metadataid)} to {title} ({agentid}) - Ran out of retries.")
 
 
 def plex_split(metadataid, config, delay):
     retries = 5
     while retries > 0:
         try:
-            tqdm.write(f"{timeoutput()} - Checking for duplicate in Plex: Splitting item with ID:{metadataid}")
+            logger.info(f"Checking for duplicate in Plex: Splitting item with ID:{metadataid}")
             url_params = {
                 'X-Plex-Token': config["plex_token"]
             }
@@ -215,15 +301,14 @@ def plex_split(metadataid, config, delay):
             resp = requests.put(url_str, params=url_params, timeout=30)
 
             if resp.status_code == 200:
-                tqdm.write(f"{timeoutput()} - Checking for duplicate in Plex: Successfully split {metadataid}.")
+                logger.info(f"Checking for duplicate in Plex: Successfully split {metadataid}.")
             else:
-                tqdm.write(f"{timeoutput()} - Checking for duplicate in Plex: Failed to split {metadataid} - Plex returned error: {resp.text}")
+                logger.error(f"Checking for duplicate in Plex: Failed to split {metadataid} - Plex returned error: {resp.text}")
             break
         except (requests.exceptions.Timeout, requests.exceptions.ConnectTimeout):
-            tqdm.write(
-                f"{timeoutput()} - Checking for duplicate in Plex: Exception splitting {metadataid} - {retries} left.")
+            logger.warning(f"Checking for duplicate in Plex: Exception splitting {metadataid} - {retries} left.")
             retries -= 1
             time.sleep(delay)
     if retries == 0:
         raise Exception(
-            f"{timeoutput()} - Checking for duplicate in Plex: Exception splitting {metadataid} - Ran out of retries.")
+            f"Checking for duplicate in Plex: Exception splitting {metadataid} - Ran out of retries.")

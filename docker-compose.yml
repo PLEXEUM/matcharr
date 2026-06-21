@@ -6,10 +6,10 @@ services:
     volumes:
       # Map your media folders - IMPORTANT: Adjust paths to match your setup
       - /path/to/media:/media:ro
-      # Optional: Mount config externally if you want to edit it without rebuilding
+      # Mount config externally for easy editing
       - ./config.json:/app/config.json:ro
+      # Single log file - everything goes here
       - ./logs:/app/logs
-      - ./logs/matcharr-cron.log:/var/log/matcharr.log
     environment:
       - TZ=America/New_York
       - CRON_SCHEDULE=0 2 * * *

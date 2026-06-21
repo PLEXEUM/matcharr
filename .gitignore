@@ -3,6 +3,10 @@ config.json
 config2.json
 *.local.json
 
+# Logs - everything goes here
+logs/
+*.log
+
 # IDE
 /.idea/
 /matcharr.iml
@@ -24,11 +28,6 @@ poetry.lock
 venv/
 ENV/
 env/
-
-# Logs
-/matcharr.log
-logs/
-*.log
 
 # Docker
 .env
