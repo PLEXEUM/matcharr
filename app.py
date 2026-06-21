@@ -6,6 +6,7 @@ libraries in Plex/Emby and fixes any mismatches created by the agents used.
 import json
 import time
 import sys
+import os          # ← ADD THIS
 import logging
 import pkg_resources
 
@@ -17,7 +18,6 @@ from utils.plex import load_plex_data, check_duplicate, arr_find_plex_id, plex_c
 from utils.arr import parse_arr_data, get_arrpaths, check_faulty
 from utils.base import timeoutput, giefbar
 from utils.logging import get_logger
-
 
 # ============================================================
 # FORCE LOG FILE CREATION - ALWAYS WRITE TO FILE
@@ -69,7 +69,6 @@ sys.stderr = TeeLogger(logger, logging.ERROR)
 # ============================================================
 # MAIN APPLICATION
 # ============================================================
-
 
 runtime = time.time()
 
@@ -207,5 +206,11 @@ logger.info(f"Sonarr instances: {len(sonarrs_config)}")
 logger.info(f"Radarr instances: {len(radarrs_config)}")
 logger.info(f"Total run time: {round(time.time() - runtime, 2)} seconds")
 logger.info("="*60)
+
+# Final flush to ensure all logs are written
+with open(LOG_FILE, "a") as f:
+    f.write(f"Run completed at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+    f.flush()
+    os.fsync(f.fileno())
 
 sys.exit(0)
