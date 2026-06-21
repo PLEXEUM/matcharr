@@ -72,16 +72,16 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
     mismatches_found = []
 
     # ============================================================
-    # DEBUG: Print all Radarr paths
+    # DEBUG: Print all Arr paths
     # ============================================================
     print("\n" + "="*60)
-    print("DEBUG: Radarr Paths Found")
+    print("DEBUG: All Arr Paths Found")
     print("="*60)
     for arrtype in arr_plex_match.keys():
-        if arrtype == "radarr":
-            for arrinstance in arr_plex_match[arrtype].keys():
-                for radarr_path in arr_plex_match[arrtype][arrinstance].keys():
-                    print(f"  {radarr_path}")
+        print(f"\n  {arrtype.upper()} paths:")
+        for arrinstance in arr_plex_match[arrtype].keys():
+            for arr_path in arr_plex_match[arrtype][arrinstance].keys():
+                print(f"    {arr_path}")
     print("="*60)
 
     # ============================================================
@@ -91,8 +91,9 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
     print("DEBUG: Plex Paths Found (first 20)")
     print("="*60)
     for section_id, items in library.items():
+        print(f"\n  Section {section_id}:")
         for item in items[:20]:  # Show first 20
-            print(f"  {item.mappedpath}")
+            print(f"    {item.mappedpath}")
     print("="*60)
 
     # ============================================================
@@ -106,25 +107,25 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
     print("="*60)
 
     # ============================================================
-    # DEBUG: Specifically check Zombieland
+    # DEBUG: Count total items in each source
     # ============================================================
     print("\n" + "="*60)
-    print("DEBUG: Searching for Zombieland")
+    print("DEBUG: Total Items")
     print("="*60)
-
-    # Check Radarr for Zombieland
-    for arrtype in arr_plex_match.keys():
-        if arrtype == "radarr":
-            for arrinstance in arr_plex_match[arrtype].keys():
-                for radarr_path in arr_plex_match[arrtype][arrinstance].keys():
-                    if "Zombieland" in radarr_path:
-                        print(f"FOUND in Radarr: {radarr_path}")
-
-    # Check Plex for Zombieland
+    radarr_count = sum(len(arr_plex_match.get("radarr", {}).get(arr, {})) for arr in arr_plex_match.get("radarr", {}))
+    sonarr_count = sum(len(arr_plex_match.get("sonarr", {}).get(arr, {})) for arr in arr_plex_match.get("sonarr", {}))
+    plex_count = 0
     for section_id, items in library.items():
-        for item in items:
-            if "Zombieland" in item.title:
-                print(f"FOUND in Plex: {item.title} - {item.mappedpath}")
+        plex_count += len(items)
+    
+    print(f"  Radarr paths: {radarr_count}")
+    print(f"  Sonarr paths: {sonarr_count}")
+    print(f"  Plex items: {plex_count}")
+    
+    # Check for any mismatches in count
+    if radarr_count != plex_count:
+        print(f"  WARNING: Radarr paths ({radarr_count}) != Plex items ({plex_count})")
+        print(f"  This suggests path mapping issues!")
     print("="*60)
     print()
 
