@@ -20,6 +20,29 @@ from utils.base import timeoutput, giefbar
 from utils.logging import get_logger
 
 # ============================================================
+# FORCE ALL OUTPUT TO STDOUT (Docker logs)
+# ============================================================
+
+# Ensure stdout/stderr go to Docker's log system
+sys.stdout = sys.__stdout__
+sys.stderr = sys.__stderr__
+
+# Enable line buffering so logs appear immediately
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(line_buffering=True)
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(line_buffering=True)
+
+# Force flush on every print
+def print_flush(*args, **kwargs):
+    kwargs['flush'] = True
+    return print(*args, **kwargs)
+
+# Replace print with flush version
+import builtins
+builtins.print = print_flush
+
+# ============================================================
 # FORCE LOG FILE CREATION - ALWAYS WRITE TO FILE
 # ============================================================
 
@@ -40,7 +63,7 @@ with open(LOG_FILE, "a") as f:
 # Setup logger (writes to both file and console)
 logger = get_logger(__name__)
 
-# Redirect stdout and stderr to also go to log file AND Docker logs
+# Redirect stdout and stderr to also go to log file
 class TeeLogger:
     def __init__(self, logger_obj, level):
         self.logger = logger_obj
@@ -49,7 +72,7 @@ class TeeLogger:
 
     def write(self, message):
         if message.strip():
-            # Write to terminal (CMD)
+            # Write to terminal
             self.terminal.write(message)
             # Write to log file via logger
             self.logger.log(self.level, message.strip())
