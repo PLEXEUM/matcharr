@@ -9,8 +9,6 @@ class Arr:
         self.data = json.loads(r.text)
 
         # Get the actual paths for each media item
-        # This gives us the full path for each movie/show
-        self.paths = {}
+        self.paths = []
         for item in self.data:
-            # Use the item's ID as key and the path as value
-            self.paths[item["id"]] = item["path"]
+            self.paths.append(item["path"])
