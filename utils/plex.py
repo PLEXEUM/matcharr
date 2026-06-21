@@ -54,9 +54,12 @@ def arr_find_plex_id(arrpaths, arr_plex_match, plex_library_paths, plex_sections
         for arr in arrpaths[arrtype].keys():
             arr_plex_match[arrtype][arr] = {}
             for arr_path in arrpaths[arrtype][arr].values():
+                # Normalize path for comparison
+                arr_path_normalized = arr_path.replace('\\', '/').rstrip('/')
                 for library in plex_library_paths.keys():
                     for plex_path in plex_library_paths[library].values():
-                        if arr_path.rstrip("/") == map_path(config, posixpath.join(plex_path, '')).rstrip("/"):
+                        plex_path_normalized = map_path(config, posixpath.join(plex_path, '')).replace('\\', '/').rstrip('/')
+                        if arr_path_normalized == plex_path_normalized:
                             arr_plex_match[arrtype][arr][arr_path] = {"plex_library_id": library}
                             plex_sections[library] = library
 
@@ -67,6 +70,63 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
     total_matched = 0
     total_skipped = 0
     mismatches_found = []
+
+    # ============================================================
+    # DEBUG: Print all Radarr paths
+    # ============================================================
+    print("\n" + "="*60)
+    print("DEBUG: Radarr Paths Found")
+    print("="*60)
+    for arrtype in arr_plex_match.keys():
+        if arrtype == "radarr":
+            for arrinstance in arr_plex_match[arrtype].keys():
+                for radarr_path in arr_plex_match[arrtype][arrinstance].keys():
+                    print(f"  {radarr_path}")
+    print("="*60)
+
+    # ============================================================
+    # DEBUG: Print all Plex paths (first 20)
+    # ============================================================
+    print("\n" + "="*60)
+    print("DEBUG: Plex Paths Found (first 20)")
+    print("="*60)
+    for section_id, items in library.items():
+        for item in items[:20]:  # Show first 20
+            print(f"  {item.mappedpath}")
+    print("="*60)
+
+    # ============================================================
+    # DEBUG: Print the path mapping
+    # ============================================================
+    print("\n" + "="*60)
+    print("DEBUG: Path Mappings")
+    print("="*60)
+    for source, dest in config['path_mappings'].items():
+        print(f"  {source} -> {dest}")
+    print("="*60)
+
+    # ============================================================
+    # DEBUG: Specifically check Zombieland
+    # ============================================================
+    print("\n" + "="*60)
+    print("DEBUG: Searching for Zombieland")
+    print("="*60)
+
+    # Check Radarr for Zombieland
+    for arrtype in arr_plex_match.keys():
+        if arrtype == "radarr":
+            for arrinstance in arr_plex_match[arrtype].keys():
+                for radarr_path in arr_plex_match[arrtype][arrinstance].keys():
+                    if "Zombieland" in radarr_path:
+                        print(f"FOUND in Radarr: {radarr_path}")
+
+    # Check Plex for Zombieland
+    for section_id, items in library.items():
+        for item in items:
+            if "Zombieland" in item.title:
+                print(f"FOUND in Plex: {item.title} - {item.mappedpath}")
+    print("="*60)
+    print()
 
     logger.info("-" * 60)
     logger.info("Starting Plex comparison")
