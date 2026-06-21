@@ -1,0 +1,14 @@
+services:
+  matcharr:
+    image: plexeum/matcharr:latest
+    container_name: matcharr
+    restart: unless-stopped
+    volumes:
+      # Map your media folders - IMPORTANT: Adjust paths to match your setup
+      - /path/to/media:/media:ro
+      # Optional: Mount config externally if you want to edit it without rebuilding
+      - ./config.json:/app/config.json:ro
+      - ./logs:/app/logs
+    environment:
+      - TZ=America/New_York
+      - CRON_SCHEDULE=0 2 * * *

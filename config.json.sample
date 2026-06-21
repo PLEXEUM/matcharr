@@ -1,0 +1,24 @@
+{
+  "plex_token": "YOUR_PLEX_TOKEN",
+  "plex_url": "http://YOUR_PLEX_IP:32400",
+  "plex_enabled": true,
+  "emby_token": "",
+  "emby_url": "https://emby.domain.tld",
+  "emby_enabled": false,
+  "delay": 10,
+  "path_mappings": {
+    "/path/to/plex/library": "/media"
+  },
+  "radarr": {
+    "radarr": {
+      "url": "http://YOUR_RADARR_IP:7878",
+      "apikey": "YOUR_RADARR_API_KEY"
+    }
+  },
+  "sonarr": {
+    "sonarr": {
+      "url": "http://YOUR_SONARR_IP:8989",
+      "apikey": "YOUR_SONARR_API_KEY"
+    }
+  }
+}

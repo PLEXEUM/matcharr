@@ -1,0 +1,45 @@
+# Config files (contains API keys/tokens)
+config.json
+config2.json
+*.local.json
+
+# IDE
+/.idea/
+/matcharr.iml
+.vscode/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+Pipfile
+Pipfile.lock
+poetry.lock
+.venv/
+venv/
+ENV/
+env/
+
+# Logs
+/matcharr.log
+logs/
+*.log
+
+# Docker
+.env
+.dockerignore
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
