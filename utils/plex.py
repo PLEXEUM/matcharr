@@ -133,6 +133,17 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
     logger.info("Starting Plex comparison")
     logger.info("-" * 60)
 
+    # Build a lookup dictionary for Plex items by path for faster matching
+    plex_lookup = {}
+    for section_id, items in library.items():
+        for plex_item in items:
+            # Use mappedpath as key
+            plex_lookup[plex_item.mappedpath] = plex_item
+            # Also add the directory path as key for matching
+            dir_path = posixpath.dirname(plex_item.mappedpath)
+            if dir_path not in plex_lookup:
+                plex_lookup[dir_path] = plex_item
+
     for arrtype in arr_plex_match.keys():
         if arrtype == "radarr":
             agent = "themoviedb"
@@ -149,145 +160,75 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
 
             logger.info(f"Checking {media_type}s from {arrinstance}")
 
-            for folder in arr_plex_match[arrtype][arrinstance].values():
-                for items in giefbar(arr[arrinstance], f'{timeoutput()} - Processing {media_type}s'):
-                    total_compared += 1
-                    matched = False
-                    skipped = False
+            # Process each arr item once
+            for items in giefbar(arr[arrinstance], f'{timeoutput()} - Processing {media_type}s'):
+                total_compared += 1
+                matched = False
 
-                    # Log progress every 100 items
-                    if total_compared % 100 == 0:
-                        logger.info(f"Progress: {total_compared} items checked")
+                # Look up by mappedpath directly
+                if items.mappedpath in plex_lookup:
+                    plex_items = plex_lookup[items.mappedpath]
+                    # Check if IDs match
+                    if arrtype == "radarr":
+                        if items.id == plex_items.id:
+                            matched = True
+                            total_matched += 1
+                        else:
+                            mismatches_found.append({
+                                "title": items.title,
+                                "media_type": media_type,
+                                "arr_instance": arrinstance,
+                                "arr_id": items.id,
+                                "plex_id": plex_items.id,
+                                "path": items.mappedpath
+                            })
+                            logger.warning(f"MISMATCH: {items.title}")
+                            logger.warning(f"  ID: {items.id} vs Plex ID: {plex_items.id}")
+                            logger.warning(f"  Path: {items.mappedpath}")
+                            try:
+                                plex_match(config["plex_url"],
+                                           config["plex_token"],
+                                           agent,
+                                           plex_items.metadataid,
+                                           items.id,
+                                           items.title,
+                                           delay)
+                                counter += 1
+                                time.sleep(delay)
+                            except TypeError:
+                                logger.error(f"Plex metadata ID appears to be missing for {items.title}")
+                    elif arrtype == "sonarr":
+                        if items.id == plex_items.id:
+                            matched = True
+                            total_matched += 1
+                        else:
+                            mismatches_found.append({
+                                "title": items.title,
+                                "media_type": media_type,
+                                "arr_instance": arrinstance,
+                                "arr_id": items.id,
+                                "plex_id": plex_items.id,
+                                "path": items.mappedpath
+                            })
+                            logger.warning(f"MISMATCH: {items.title}")
+                            logger.warning(f"  ID: {items.id} vs Plex ID: {plex_items.id}")
+                            logger.warning(f"  Path: {items.mappedpath}")
+                            try:
+                                plex_match(config["plex_url"],
+                                           config["plex_token"],
+                                           agent,
+                                           plex_items.metadataid,
+                                           items.id,
+                                           items.title,
+                                           delay)
+                                counter += 1
+                                time.sleep(delay)
+                            except TypeError:
+                                logger.error(f"Plex metadata ID appears to be missing for {items.title}")
 
-                    for plex_items in library[folder.get("plex_library_id")]:
-                        if items.mappedpath in [posixpath.dirname(plex_items.mappedpath), plex_items.mappedpath]:
-                            if plex_items.agent == "imdb":
-                                if items.imdb == plex_items.id:
-                                    matched = True
-                                    total_matched += 1
-                                    break
-                                else:
-                                    mismatches_found.append({
-                                        "title": items.title,
-                                        "media_type": media_type,
-                                        "arr_instance": arrinstance,
-                                        "arr_id": items.imdb,
-                                        "plex_id": plex_items.id,
-                                        "path": items.mappedpath
-                                    })
-                                    logger.warning(f"MISMATCH: {items.title}")
-                                    logger.warning(f"  IMDB ID: {items.imdb} vs Plex ID: {plex_items.id}")
-                                    logger.warning(f"  Path: {items.mappedpath}")
-
-                                    try:
-                                        plex_match(config["plex_url"],
-                                                   config["plex_token"],
-                                                   "imdb",
-                                                   plex_items.metadataid,
-                                                   items.imdb,
-                                                   items.title,
-                                                   delay)
-                                        counter += 1
-                                        time.sleep(delay)
-                                    except TypeError:
-                                        logger.error(f"Plex metadata ID appears to be missing for {items.title}")
-                                    break
-
-                            elif plex_items.agent == "plex":
-                                match_found = 0
-                                if arrtype == "radarr":
-                                    for tmdbid in plex_items.tmdb:
-                                        if items.id == tmdbid:
-                                            match_found = 1
-                                            break
-                                    if not match_found:
-                                        mismatches_found.append({
-                                            "title": items.title,
-                                            "media_type": media_type,
-                                            "arr_instance": arrinstance,
-                                            "arr_id": items.id,
-                                            "plex_id": plex_items.tmdb,
-                                            "path": items.mappedpath
-                                        })
-                                        logger.warning(f"MISMATCH: {items.title}")
-                                        logger.warning(f"  TMDB ID: {items.id} vs Plex ID: {plex_items.tmdb}")
-                                        logger.warning(f"  Path: {items.mappedpath}")
-
-                                        try:
-                                            plex_match(config["plex_url"],
-                                                       config["plex_token"],
-                                                       "plextmdb",
-                                                       plex_items.metadataid,
-                                                       items.id,
-                                                       items.title,
-                                                       delay)
-                                            counter += 1
-                                            time.sleep(delay)
-                                        except TypeError:
-                                            logger.error(f"Plex metadata ID appears to be missing for {items.title}")
-                                elif arrtype == "sonarr":
-                                    for tvdbid in plex_items.tvdb:
-                                        if items.id == tvdbid:
-                                            match_found = 1
-                                            break
-                                    if not match_found:
-                                        mismatches_found.append({
-                                            "title": items.title,
-                                            "media_type": media_type,
-                                            "arr_instance": arrinstance,
-                                            "arr_id": items.id,
-                                            "plex_id": plex_items.tvdb,
-                                            "path": items.mappedpath
-                                        })
-                                        logger.warning(f"MISMATCH: {items.title}")
-                                        logger.warning(f"  TVDB ID: {items.id} vs Plex ID: {plex_items.tvdb}")
-                                        logger.warning(f"  Path: {items.mappedpath}")
-
-                                        try:
-                                            plex_match(config["plex_url"],
-                                                       config["plex_token"],
-                                                       "plextvdb",
-                                                       plex_items.metadataid,
-                                                       items.id,
-                                                       items.title,
-                                                       delay)
-                                            counter += 1
-                                            time.sleep(delay)
-                                        except TypeError:
-                                            logger.error(f"Plex metadata ID appears to be missing for {items.title}")
-                                break
-
-                            else:
-                                if items.id == plex_items.id:
-                                    matched = True
-                                    total_matched += 1
-                                    break
-                                else:
-                                    mismatches_found.append({
-                                        "title": items.title,
-                                        "media_type": media_type,
-                                        "arr_instance": arrinstance,
-                                        "arr_id": items.id,
-                                        "plex_id": plex_items.id,
-                                        "path": items.mappedpath
-                                    })
-                                    logger.warning(f"MISMATCH: {items.title}")
-                                    logger.warning(f"  {agent} ID: {items.id} vs Plex ID: {plex_items.id}")
-                                    logger.warning(f"  Path: {items.mappedpath}")
-
-                                    try:
-                                        plex_match(config["plex_url"],
-                                                   config["plex_token"],
-                                                   agent,
-                                                   plex_items.metadataid,
-                                                   items.id,
-                                                   items.title,
-                                                   delay)
-                                        counter += 1
-                                        time.sleep(delay)
-                                    except TypeError:
-                                        logger.error(f"Plex metadata ID appears to be missing for {items.title}")
-                                    break
+                # Log progress every 100 items
+                if total_compared % 100 == 0:
+                    logger.info(f"Progress: {total_compared} items checked")
 
     # Print final summary
     logger.info("-" * 60)
