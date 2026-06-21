@@ -1,5 +1,4 @@
-git rm dockerfile
-echo 'FROM python:3.8-slim
+FROM python:3.8-slim
 
 WORKDIR /app
 
@@ -18,4 +17,4 @@ COPY classes/ ./classes/
 COPY utils/ ./utils/
 
 # Run the script
-CMD ["python", "./app.py"]' > dockerfile
+CMD ["python", "./app.py"]
