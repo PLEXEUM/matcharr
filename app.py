@@ -6,7 +6,7 @@ libraries in Plex/Emby and fixes any mismatches created by the agents used.
 import json
 import time
 import sys
-import os          # ← ADD THIS
+import os
 import logging
 import pkg_resources
 
@@ -40,7 +40,7 @@ with open(LOG_FILE, "a") as f:
 # Setup logger (writes to both file and console)
 logger = get_logger(__name__)
 
-# Redirect stdout and stderr to also go to log file
+# Redirect stdout and stderr to also go to log file AND Docker logs
 class TeeLogger:
     def __init__(self, logger_obj, level):
         self.logger = logger_obj
@@ -49,7 +49,7 @@ class TeeLogger:
 
     def write(self, message):
         if message.strip():
-            # Write to terminal
+            # Write to terminal (CMD)
             self.terminal.write(message)
             # Write to log file via logger
             self.logger.log(self.level, message.strip())
@@ -72,29 +72,33 @@ sys.stderr = TeeLogger(logger, logging.ERROR)
 
 runtime = time.time()
 
-# Log startup
-logger.info("="*60)
-logger.info("Matcharr Started")
-logger.info("="*60)
+# Log startup - this goes to BOTH file AND Docker logs
+print("="*60)
+print("Matcharr Started")
+print("="*60)
 
 # Load configuration
 config = json.load(open("config.json"))
 
 # Log path mappings
-logger.info(f"Config loaded with {len(config['path_mappings'])} path mappings")
+print(f"Config loaded with {len(config['path_mappings'])} path mappings")
 for source, dest in config['path_mappings'].items():
-    logger.info(f"  {source} -> {dest}")
+    print(f"  {source} -> {dest}")
+
+# Check for required config fields
+if "emby_enabled" not in config:
+    config["emby_enabled"] = False
+    print("emby_enabled not found in config, defaulting to False")
+if "emby_token" not in config:
+    config["emby_token"] = ""
+if "emby_url" not in config:
+    config["emby_url"] = "https://emby.domain.tld"
 
 sonarr_config = config["sonarr"].keys()
-logger.debug("Sonarr config: %s", sonarr_config)
 radarr_config = config["radarr"].keys()
-logger.debug("Radarr config: %s", radarr_config)
 delay = config["delay"]
-logger.debug("Plex delay: %s", delay)
 emby_enabled = config["emby_enabled"]
-logger.debug("Emby enabled: %s", emby_enabled)
 plex_enabled = config["plex_enabled"]
-logger.debug("Plex enabled: %s", plex_enabled)
 plex_sections, emby_sections, sonarrs_config, radarrs_config = dict(), dict(), dict(), dict()
 
 for sonarr in sonarr_config:
@@ -104,7 +108,7 @@ for radarr in radarr_config:
     radarrs_config[radarr] = config["radarr"][radarr]
 
 if not bool(radarrs_config.keys()) and not bool(sonarrs_config.keys()):
-    logger.error("No Arrs configured - Exiting.")
+    print("No Arrs configured - Exiting.")
     sys.exit(0)
 
 # Load data from Arr instances.
@@ -169,7 +173,7 @@ if plex_enabled:
                                              plexlibrary,
                                              config,
                                              delay)
-    logger.info(f"Number of fixed matches in Plex: {PLEX_FIXED_MATCHES}")
+    print(f"Number of fixed matches in Plex: {PLEX_FIXED_MATCHES}")
 
 if emby_enabled:
     # Load data from Emby.
@@ -187,25 +191,25 @@ if emby_enabled:
                                              radarr_items,
                                              embylibrary,
                                              config)
-    logger.info(f"Number of fixed matches in Emby: {EMBY_FIXED_MATCHES}")
+    print(f"Number of fixed matches in Emby: {EMBY_FIXED_MATCHES}")
 
 # Final summary
-logger.info("="*60)
-logger.info("SCAN COMPLETE")
-logger.info("="*60)
+print("="*60)
+print("SCAN COMPLETE")
+print("="*60)
 
 if plex_enabled:
-    logger.info(f"Plex movies checked: {len(plexlibrary.get(5, []))}")
-    logger.info(f"Plex TV shows checked: {len(plexlibrary.get(2, []))}")
-    logger.info(f"Total fixes applied: {PLEX_FIXED_MATCHES}")
+    print(f"Plex movies checked: {len(plexlibrary.get(5, []))}")
+    print(f"Plex TV shows checked: {len(plexlibrary.get(2, []))}")
+    print(f"Total fixes applied: {PLEX_FIXED_MATCHES}")
 
 if emby_enabled:
-    logger.info(f"Emby fixes applied: {EMBY_FIXED_MATCHES}")
+    print(f"Emby fixes applied: {EMBY_FIXED_MATCHES}")
 
-logger.info(f"Sonarr instances: {len(sonarrs_config)}")
-logger.info(f"Radarr instances: {len(radarrs_config)}")
-logger.info(f"Total run time: {round(time.time() - runtime, 2)} seconds")
-logger.info("="*60)
+print(f"Sonarr instances: {len(sonarrs_config)}")
+print(f"Radarr instances: {len(radarrs_config)}")
+print(f"Total run time: {round(time.time() - runtime, 2)} seconds")
+print("="*60)
 
 # Final flush to ensure all logs are written
 with open(LOG_FILE, "a") as f:
