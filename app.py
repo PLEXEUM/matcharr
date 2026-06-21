@@ -18,24 +18,58 @@ from utils.arr import parse_arr_data, get_arrpaths, check_faulty
 from utils.base import timeoutput, giefbar
 from utils.logging import get_logger
 
-# Setup logging
+
+# ============================================================
+# FORCE LOG FILE CREATION - ALWAYS WRITE TO FILE
+# ============================================================
+
+# Create logs directory if it doesn't exist
+os.makedirs("/app/logs", exist_ok=True)
+
+# Define log file path
+LOG_FILE = "/app/logs/matcharr.log"
+
+# Write startup message directly to log file (bypasses logger)
+with open(LOG_FILE, "a") as f:
+    f.write("\n" + "="*60 + "\n")
+    f.write(f"Matcharr Started - {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+    f.write("="*60 + "\n")
+    f.flush()
+    os.fsync(f.fileno())  # Force write to disk
+
+# Setup logger (writes to both file and console)
 logger = get_logger(__name__)
 
-# Redirect stdout and stderr to logger
-class LoggerWriter:
-    def __init__(self, logger, level):
-        self.logger = logger
+# Redirect stdout and stderr to also go to log file
+class TeeLogger:
+    def __init__(self, logger_obj, level):
+        self.logger = logger_obj
         self.level = level
+        self.terminal = sys.stdout
 
     def write(self, message):
         if message.strip():
+            # Write to terminal
+            self.terminal.write(message)
+            # Write to log file via logger
             self.logger.log(self.level, message.strip())
+            # Also write directly to file to ensure it's saved
+            with open(LOG_FILE, "a") as f:
+                f.write(message)
+                f.flush()
+                os.fsync(f.fileno())
 
     def flush(self):
-        pass
+        self.terminal.flush()
 
-sys.stdout = LoggerWriter(logger, logging.INFO)
-sys.stderr = LoggerWriter(logger, logging.ERROR)
+# Replace stdout and stderr
+sys.stdout = TeeLogger(logger, logging.INFO)
+sys.stderr = TeeLogger(logger, logging.ERROR)
+
+# ============================================================
+# MAIN APPLICATION
+# ============================================================
+
 
 runtime = time.time()
 
