@@ -33,15 +33,6 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(line_buffering=True)
 
-# Force flush on every print
-def print_flush(*args, **kwargs):
-    kwargs['flush'] = True
-    return print(*args, **kwargs)
-
-# Replace print with flush version
-import builtins
-builtins.print = print_flush
-
 # ============================================================
 # FORCE LOG FILE CREATION - ALWAYS WRITE TO FILE
 # ============================================================
