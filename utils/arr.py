@@ -31,8 +31,7 @@ def get_arrpaths(paths, config):
         for arr, data in paths[arrtype].items():
             arrpaths[arrtype][arr] = {}
             for x, path in enumerate(data):
-                # path is already a string, just map it directly
-                arrpaths[arrtype][arr][x] = map_path(config, path)
+                arrpaths[arrtype][arr][x] = map_path(config, path.get('path'))
     return arrpaths
 
 
