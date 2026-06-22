@@ -8,6 +8,9 @@ from plexapi.video import Show
 from plexapi.video import Movie
 from classes.plex import Plex
 from utils.base import timeoutput, giefbar, tqdm, map_path
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def load_plex_data(server, plex_sections, plexlibrary, config):
@@ -73,6 +76,10 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                 for items in giefbar(arr[arrinstance], f'{timeoutput()} - Checking Plex against {arrinstance}'):
                     for plex_items in library[folder.get("plex_library_id")]:
                         if items.mappedpath in [posixpath.dirname(plex_items.mappedpath), plex_items.mappedpath]:
+                            
+                            # Debug logging - shows every comparison
+                            logger.debug(f"Comparing: {items.title} (Arr {arrtype} ID: {items.id}) vs Plex: {plex_items.title} (Plex ID: {plex_items.id})")
+                            
                             if plex_items.agent == "imdb":
                                 if items.imdb == plex_items.id:
                                     break
