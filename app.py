@@ -15,7 +15,7 @@ from utils.emby import load_emby_data, arr_find_emby_id, emby_compare_media
 from utils.plex import load_plex_data, check_duplicate, arr_find_plex_id, plex_compare_media
 from utils.arr import parse_arr_data, get_arrpaths, check_faulty
 from utils.base import timeoutput, giefbar
-from utils.logging import get_logger
+from utils.logging import setup_logging, get_logger
 
 # TODO add logging
 #  add validation for Arr/Plex/Emby config entries
@@ -29,7 +29,7 @@ from utils.logging import get_logger
 runtime = time.time()
 
 # Logging
-logger = get_logger(__name__)
+logger = setup_logging()
 logger.info("Running Matcharr.")
 logger.debug("Using PlexAPI version %s", pkg_resources.get_distribution("plexapi").version)
 logger.debug("Using requests version %s", pkg_resources.get_distribution("requests").version)
