@@ -4,11 +4,8 @@ services:
     container_name: matcharr
     restart: unless-stopped
     volumes:
-      # Map your media folders - IMPORTANT: Adjust paths to match your setup
-      - /path/to/media:/media:ro
-      # Mount config externally for easy editing
+      # Mount config externally if you want to edit it without rebuilding
       - ./config.json:/app/config.json:ro
-      # Single log file - everything goes here
       - ./logs:/app/logs
     environment:
       - TZ=America/New_York

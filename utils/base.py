@@ -12,10 +12,19 @@ def giefbar(iterator, desc):
 
 
 def map_path(config, path):
-    for mapped_path, mapping in config['path_mappings'].items():
-        # Original: if path.startswith(mapping):
-        # This assumed path starts with container path
-        # You need: if path starts with your Windows path
-        if path.startswith(mapped_path):  # ← Changed this line
-            return path.replace(mapped_path, mapping)  # ← Changed this line
+    """
+    Map a path from Sonarr/Radarr format to Plex/Emby format.
+    
+    Args:
+        config: Configuration dictionary containing path_mappings
+        path: The path to map (from Sonarr/Radarr)
+    
+    Returns:
+        The mapped path, or the original path if no mapping matches
+    """
+    for source_path, dest_path in config['path_mappings'].items():
+        # Check if the input path starts with the source path
+        if path.startswith(source_path):
+            # Replace the source path with the destination path
+            return path.replace(source_path, dest_path)
     return path
