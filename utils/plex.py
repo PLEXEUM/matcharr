@@ -32,10 +32,10 @@ def load_plex_data(server, plex_sections, plexlibrary, config):
         # Get the root items (shows for TV, movies for movies)
         if section.type == "show":
             from plexapi.video import Show
-            media = [item for item in section.all() if isinstance(item, Show)]
+            media = [item for item in section.all(includeGuids=1) if isinstance(item, Show)]
             logger.debug(f"Loaded {len(media)} shows from TV section {section.title}")
         else:
-            media = section.all()
+            media = section.all(includeGuids=1)
             logger.debug(f"Loaded {len(media)} movies from Movie section {section.title}")
         
         plexlibrary[sectionid] = [Plex(row.locations[0],
