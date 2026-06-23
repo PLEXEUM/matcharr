@@ -17,6 +17,9 @@ def load_plex_data(server, plex_sections, plexlibrary, config):
     for sectionid in plex_sections.values():
         section = server.library.sectionByID(sectionid)
         
+        # FIX 1: Add debug logging for section loading
+        logger.info(f"📂 Loading Plex section: {section.title} (ID: {sectionid}, Type: {section.type})")
+        
         # Get the root items (shows for TV, movies for movies)
         if section.type == "show":
             from plexapi.video import Show
@@ -55,37 +58,64 @@ def check_duplicate(server, plex_sections, config, delay):
 
 
 def arr_find_plex_id(arrpaths, arr_plex_match, plex_library_paths, plex_sections, config):
+    # FIX 2: Add debug logging for path matching
+    logger.info(f"🔍 Finding Plex IDs for arr paths")
+    
     for arrtype in arrpaths.keys():
+        logger.info(f"  📁 Processing {arrtype} instances: {list(arrpaths[arrtype].keys())}")
         arr_plex_match[arrtype] = {}
+        
         for arr in arrpaths[arrtype].keys():
             arr_plex_match[arrtype][arr] = {}
+            logger.debug(f"    🔎 Matching paths for {arr} ({len(arrpaths[arrtype][arr])} paths)")
+            
             for arr_path in arrpaths[arrtype][arr].values():
                 for library in plex_library_paths.keys():
                     for plex_path in plex_library_paths[library].values():
                         if arr_path.rstrip("/") == map_path(config, posixpath.join(plex_path, '')).rstrip("/"):
                             arr_plex_match[arrtype][arr][arr_path] = {"plex_library_id": library}
                             plex_sections[library] = library
+                            logger.debug(f"      ✅ Matched path: {arr_path} -> Plex library {library}")
+                            break
 
 
 def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
     counter = 0
     
+    # FIX 3: Properly count total items across all instances
+    total_sonarr = sum(len(items) for items in sonarr.values()) if sonarr else 0
+    total_radarr = sum(len(items) for items in radarr.values()) if radarr else 0
+    
     # FORCE LOG - Show what's being compared
-    logger.info(f"📊 Starting comparison - Radarr movies: {len(radarr.get('radarr', []))} items, Sonarr shows: {len(sonarr.get('sonarr', []))} items")
+    logger.info(f"📊 Starting comparison - Radarr movies: {total_radarr} items, Sonarr shows: {total_sonarr} items")
+    logger.info(f"  📁 Sonarr instances: {list(sonarr.keys()) if sonarr else []}")
+    logger.info(f"  📁 Radarr instances: {list(radarr.keys()) if radarr else []}")
     
     for arrtype in arr_plex_match.keys():
         if arrtype == "radarr":
             agent = "themoviedb"
             arr = radarr
-            logger.info(f"🎬 Comparing {len(arr.get('radarr', []))} movies from Radarr against Plex")
+            logger.info(f"🎬 Comparing Radarr instances: {list(arr.keys()) if arr else []}")
         elif arrtype == "sonarr":
             agent = "thetvdb"
             arr = sonarr
-            logger.info(f"📺 Comparing {len(arr.get('sonarr', []))} TV shows from Sonarr against Plex")
+            logger.info(f"📺 Comparing Sonarr instances: {list(arr.keys()) if arr else []}")
+            
         for arrinstance in arr_plex_match[arrtype].keys():
-            if len(arrinstance) == 0:
+            # FIX 4: Check if instance exists in arr data
+            if arrinstance not in arr:
+                logger.warning(f"⚠️ Instance '{arrinstance}' not found in {arrtype} data - available: {list(arr.keys()) if arr else []}")
                 continue
+            
+            # FIX 5: Log the instance being processed
+            logger.info(f"🔍 Processing {arrinstance} with {len(arr[arrinstance])} items")
+            
+            if len(arr[arrinstance]) == 0:
+                logger.warning(f"⚠️ No items found for {arrinstance}")
+                continue
+                
             for folder in arr_plex_match[arrtype][arrinstance].values():
+                # FIX 6: Properly iterate over arr items
                 for items in giefbar(arr[arrinstance], f'{timeoutput()} - Checking Plex against {arrinstance}'):
                     
                     # FORCE LOG for first item only
@@ -139,7 +169,7 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                                         try:
                                             plex_match(config["plex_url"],
                                                        config["plex_token"],
-                                                       "plextmdb",  # ← Fixed: was "plextvdb"
+                                                       "plextmdb",
                                                        plex_items.metadataid,
                                                        items.id,
                                                        items.title,
