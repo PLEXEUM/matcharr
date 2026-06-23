@@ -14,7 +14,7 @@ from classes.embydb import EmbyDB
 from utils.emby import load_emby_data, arr_find_emby_id, emby_compare_media
 from utils.plex import load_plex_data, check_duplicate, arr_find_plex_id, plex_compare_media
 from utils.arr import parse_arr_data, get_arrpaths, check_faulty
-from utils.base import timeoutput, giefbar
+from utils.base import timeoutput, giefbar, normalize_path
 from utils.logging import setup_logging, get_logger
 
 # TODO add logging
@@ -132,6 +132,14 @@ if plex_enabled:
         server.reload()
 
     load_plex_data(server, plex_sections, plexlibrary, config)
+
+    # DEBUG: Log Radarr data structure before comparison
+    logger.debug(f"Radarr items structure: {list(radarr_items.keys())}")
+    if radarr_items:
+        for instance, movies in radarr_items.items():
+            logger.debug(f"  Radarr instance '{instance}' has {len(movies)} movies")
+            if movies:
+                logger.debug(f"    First movie: {movies[0].title} (TMDb: {movies[0].id})")
 
     # INFO level logs go to file only
     logger.info("Plex library data loaded:")

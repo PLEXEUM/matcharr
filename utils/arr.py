@@ -1,7 +1,7 @@
 import pandas as pd
 
 from classes.arrmedia import ArrMedia
-from utils.base import timeoutput, giefbar, map_path
+from utils.base import timeoutput, giefbar, map_path, normalize_path
 
 
 def parse_arr_data(media, sonarr, radarr, config):
@@ -31,7 +31,7 @@ def get_arrpaths(paths, config):
         for arr, data in paths[arrtype].items():
             arrpaths[arrtype][arr] = {}
             for x, path in enumerate(data):
-                arrpaths[arrtype][arr][x] = map_path(config, path.get('path'))
+                arrpaths[arrtype][arr][x] = normalize_path(map_path(config, path.get('path')))
     return arrpaths
 
 

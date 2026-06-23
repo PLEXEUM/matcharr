@@ -1,3 +1,4 @@
+import os
 import posixpath
 import time
 import requests
@@ -12,6 +13,14 @@ from utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+def normalize_path(path):
+    """Normalize path for cross-platform comparison."""
+    if not path:
+        return path
+    # Convert backslashes to forward slashes and normalize
+    normalized = os.path.normpath(path).replace('\\', '/')
+    # Remove trailing slash for consistent comparison
+    return normalized.rstrip('/')
 
 def load_plex_data(server, plex_sections, plexlibrary, config):
     for sectionid in plex_sections.values():
@@ -70,9 +79,14 @@ def arr_find_plex_id(arrpaths, arr_plex_match, plex_library_paths, plex_sections
             logger.debug(f"Matching paths for {arr} ({len(arrpaths[arrtype][arr])} paths)")
             
             for arr_path in arrpaths[arrtype][arr].values():
+                normalized_arr_path = normalize_path(arr_path)
                 for library in plex_library_paths.keys():
                     for plex_path in plex_library_paths[library].values():
-                        if arr_path.rstrip("/") == map_path(config, posixpath.join(plex_path, '')).rstrip("/"):
+                        # Map and normalize both paths for comparison
+                        mapped_plex_path = map_path(config, posixpath.join(plex_path, ''))
+                        normalized_plex_path = normalize_path(mapped_plex_path)
+                        
+                        if normalized_arr_path == normalized_plex_path:
                             arr_plex_match[arrtype][arr][arr_path] = {"plex_library_id": library}
                             plex_sections[library] = library
                             logger.debug(f"Matched path: {arr_path} -> Plex library {library}")
@@ -138,11 +152,17 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                     path_matched = False
                     
                     for plex_items in library[library_id]:
+                        # Normalize both paths for comparison
+                        normalized_arr_path = normalize_path(items.mappedpath)
+                        normalized_plex_path = normalize_path(plex_items.mappedpath)
+                        normalized_plex_dir = normalize_path(os.path.dirname(plex_items.mappedpath))
+    
                         # DEBUG: Log the paths being compared
-                        logger.debug(f"Path check - Arr: '{items.mappedpath}' vs Plex: '{plex_items.mappedpath}'")
-                        logger.debug(f"Path check - Plex dirname: '{posixpath.dirname(plex_items.mappedpath)}'")
-                        
-                        if items.mappedpath in [posixpath.dirname(plex_items.mappedpath), plex_items.mappedpath]:
+                        logger.debug(f"Path check - Arr: '{normalized_arr_path}' vs Plex: '{normalized_plex_path}'")
+                        logger.debug(f"Path check - Plex dirname: '{normalized_plex_dir}'")
+    
+                        # Check if Arr path matches Plex file path OR Plex directory path
+                        if normalized_arr_path in [normalized_plex_dir, normalized_plex_path]:
                             path_matched = True
                             
                             # DEBUG only - goes to file

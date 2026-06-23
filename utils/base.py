@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from tqdm import tqdm
 
@@ -28,3 +29,10 @@ def map_path(config, path):
             # Replace the source path with the destination path
             return path.replace(source_path, dest_path)
     return path
+
+def normalize_path(path):
+    """Normalize path for cross-platform comparison."""
+    if not path:
+        return path
+    normalized = os.path.normpath(path).replace('\\', '/')
+    return normalized.rstrip('/')
