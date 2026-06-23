@@ -154,6 +154,7 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                 # Build lookup maps from Plex library
                 tmdb_lookup = {}
                 tvdb_lookup = {}
+                path_lookup = {}  # For path-based matching fallback
                 for plex_item in library[library_id]:
                     if plex_item.tmdb:
                         for tmdb_id in plex_item.tmdb:
@@ -161,8 +162,13 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                     if plex_item.tvdb:
                         for tvdb_id in plex_item.tvdb:
                             tvdb_lookup[str(tvdb_id)] = plex_item
+                    # Build path lookup for Sonarr fallback
+                    if plex_item.mappedpath:
+                        path_lookup[plex_item.mappedpath] = plex_item
+                        path_lookup[posixpath.dirname(plex_item.mappedpath)] = plex_item
                 logger.debug(f"Built TMDb lookup map with {len(tmdb_lookup)} entries")
                 logger.debug(f"Built TVDB lookup map with {len(tvdb_lookup)} entries")
+                logger.debug(f"Built Path lookup map with {len(path_lookup)} entries")
                 
                 # Log first 5 Plex paths for debugging
                 logger.debug(f"=== DEBUG: First 5 Plex paths in library {library_id} ===")
@@ -172,40 +178,37 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                 logger.debug(f"Arr items count: {len(arr[arrinstance])}")
                 
                 for items in giefbar(arr[arrinstance], f'{timeoutput()} - Checking Plex against {arrinstance}'):
-                    # Look up by appropriate ID
-                    if arrtype == "sonarr":
-                        lookup = tvdb_lookup
-                        id_type = "TVDB"
-                    else:
-                        lookup = tmdb_lookup
-                        id_type = "TMDb"
-    
+                    plex_items = None
                     matched = False
     
-                    # Try ID lookup first
-                    if str(items.id) in lookup:
-                        plex_items = lookup[str(items.id)]
-                        matched = True
+                    # For Radarr: Use TMDb ID lookup
+                    if arrtype == "radarr":
+                        if str(items.id) in tmdb_lookup:
+                            plex_items = tmdb_lookup[str(items.id)]
+                            matched = True
     
-                    # For Sonarr only: if no TVDB ID match, try title matching
-                    if not matched and arrtype == "sonarr":
-                        logger.debug(f"TVDB ID not found for '{items.title}', trying title match...")
-                        for plex_item in library[library_id]:
-                            if items.title.lower() == plex_item.title.lower():
-                                plex_items = plex_item
-                                matched = True
-                                logger.debug(f"Found by title match: {items.title} -> {plex_items.title}")
-                                break
-    
-                    if matched:
-                        # ... rest of comparison logic (agent checks, plex_match calls, etc.)
-            
+                    # For Sonarr: Try TVDB ID first, then path fallback
+                    elif arrtype == "sonarr":
+                        # Try TVDB ID lookup first
+                        if str(items.id) in tvdb_lookup:
+                            plex_items = tvdb_lookup[str(items.id)]
+                            matched = True
+                        else:
+                            # Fall back to path-based matching
+                            for plex_item in library[folder.get("plex_library_id")]:
+                                if items.mappedpath in [posixpath.dirname(plex_item.mappedpath), plex_item.mappedpath]:
+                                    plex_items = plex_item
+                                    matched = True
+                                    logger.debug(f"Found by PATH for Sonarr: {items.title} -> {plex_items.title}")
+                                    break
+
+                    if matched and plex_items:
                         # DEBUG only - goes to file
                         if arrtype == "sonarr":
                             logger.debug(f"Comparing: {items.title} (Sonarr TVDB ID: {items.id}) vs Plex: {plex_items.title} (Plex TVDB IDs: {plex_items.tvdb})")
                         elif arrtype == "radarr":
                             logger.debug(f"Comparing: {items.title} (Radarr TMDB ID: {items.id}) vs Plex: {plex_items.title} (Plex TMDB IDs: {plex_items.tmdb})")
-            
+
                         if plex_items.agent == "imdb":
                             if items.imdb == plex_items.id:
                                 continue
@@ -255,7 +258,7 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                                     except TypeError:
                                         tqdm.write(f"{timeoutput()} - Plex metadata ID appears to be missing.")
                                     counter += 1
-                
+
                             elif arrtype == "sonarr":
                                 for tvdbid in plex_items.tvdb:
                                     if items.id == tvdbid:
@@ -300,7 +303,7 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                                 tqdm.write(f"{timeoutput()} - Plex metadata ID appears to be missing.")
                             counter += 1
                     else:
-                        logger.debug(f"No Plex match found by {id_type} ID for: {items.title} (ID: {items.id})")
+                        logger.debug(f"No Plex match found for: {items.title} (ID: {items.id})")
     
     return counter
 
