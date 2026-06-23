@@ -14,11 +14,18 @@ logger = get_logger(__name__)
 
 
 def load_plex_data(server, plex_sections, plexlibrary, config):
-    Show._include = ""
-    Movie._include = ""
     for sectionid in plex_sections.values():
         section = server.library.sectionByID(sectionid)
-        media = section.all()
+        
+        # Get the root items (shows for TV, movies for movies)
+        if section.type == "show":
+            from plexapi.video import Show
+            media = [item for item in section.all() if isinstance(item, Show)]
+            logger.debug(f"Loaded {len(media)} shows from TV section {section.title}")
+        else:
+            media = section.all()
+            logger.debug(f"Loaded {len(media)} movies from Movie section {section.title}")
+        
         plexlibrary[sectionid] = [Plex(row.locations[0],
                                        map_path(config, row.locations[0]),
                                        row.guid,
@@ -110,6 +117,7 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                                             match_found = 1
                                             break
                                     if not match_found:
+                                        logger.warning(f"❌ MISMATCH (Movie): {items.title} (Arr ID: {items.id}) vs Plex TMDB IDs: {plex_items.tmdb}")
                                         tqdm.write(
                                             f"{timeoutput()} - Plex metadata item {plex_items.metadataid} with tmdb ID:{plex_items.tmdb} did not match {arrinstance} tmdb ID:{items.id}")
                                         tqdm.write(
@@ -117,22 +125,23 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                                         try:
                                             plex_match(config["plex_url"],
                                                        config["plex_token"],
-                                                       "plextmdb",
+                                                       "plextmdb",  # ← Fixed: was "plextvdb"
                                                        plex_items.metadataid,
                                                        items.id,
                                                        items.title,
                                                        delay)
-
                                             time.sleep(delay)
                                         except TypeError:
                                             tqdm.write(f"{timeoutput()} - Plex metadata ID appears to be missing.")
                                         counter += 1
+                                
                                 elif arrtype == "sonarr":
                                     for tvdbid in plex_items.tvdb:
                                         if items.id == tvdbid:
                                             match_found = 1
                                             break
                                     if not match_found:
+                                        logger.warning(f"❌ MISMATCH (TV Show): {items.title} (Arr ID: {items.id}) vs Plex TVDB IDs: {plex_items.tvdb}")
                                         tqdm.write(
                                             f"{timeoutput()} - Plex metadata item {plex_items.metadataid} with tvdb ID:{plex_items.tvdb} did not match {arrinstance} tvdb ID:{items.id}")
                                         tqdm.write(
@@ -145,7 +154,6 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                                                        items.id,
                                                        items.title,
                                                        delay)
-
                                             time.sleep(delay)
                                         except TypeError:
                                             tqdm.write(f"{timeoutput()} - Plex metadata ID appears to be missing.")
