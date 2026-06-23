@@ -69,23 +69,37 @@ def arr_find_plex_id(arrpaths, arr_plex_match, plex_library_paths, plex_sections
 
 def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
     counter = 0
+    
+    # FORCE LOG - Show what's being compared
+    logger.info(f"📊 Starting comparison - Radarr movies: {len(radarr.get('radarr', []))} items, Sonarr shows: {len(sonarr.get('sonarr', []))} items")
+    
     for arrtype in arr_plex_match.keys():
         if arrtype == "radarr":
             agent = "themoviedb"
             arr = radarr
+            logger.info(f"🎬 Comparing {len(arr.get('radarr', []))} movies from Radarr against Plex")
         elif arrtype == "sonarr":
             agent = "thetvdb"
             arr = sonarr
+            logger.info(f"📺 Comparing {len(arr.get('sonarr', []))} TV shows from Sonarr against Plex")
         for arrinstance in arr_plex_match[arrtype].keys():
             if len(arrinstance) == 0:
                 continue
             for folder in arr_plex_match[arrtype][arrinstance].values():
                 for items in giefbar(arr[arrinstance], f'{timeoutput()} - Checking Plex against {arrinstance}'):
+                    
+                    # FORCE LOG for first item only
+                    if items == arr[arrinstance][0]:
+                        logger.info(f"🔍 First comparison: {items.title} (Arr {arrtype} ID: {items.id})")
+                    
                     for plex_items in library[folder.get("plex_library_id")]:
                         if items.mappedpath in [posixpath.dirname(plex_items.mappedpath), plex_items.mappedpath]:
                             
                             # Debug logging - shows every comparison
-                            logger.debug(f"Comparing: {items.title} (Arr {arrtype} ID: {items.id}) vs Plex: {plex_items.title} (Plex ID: {plex_items.id})")
+                            if arrtype == "sonarr":
+                                logger.debug(f"Comparing: {items.title} (Sonarr TVDB ID: {items.id}) vs Plex: {plex_items.title} (Plex TVDB IDs: {plex_items.tvdb})")
+                            elif arrtype == "radarr":
+                                logger.debug(f"Comparing: {items.title} (Radarr TMDB ID: {items.id}) vs Plex: {plex_items.title} (Plex TMDB IDs: {plex_items.tmdb})")
                             
                             if plex_items.agent == "imdb":
                                 if items.imdb == plex_items.id:
