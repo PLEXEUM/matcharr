@@ -3,6 +3,10 @@ config.json
 config2.json
 *.local.json
 
+# Backups
+*-backup/
+backup-*/
+
 # Logs - everything goes here
 logs/
 *.log

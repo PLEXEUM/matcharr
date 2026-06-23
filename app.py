@@ -1,188 +1,185 @@
 """
-Matcharr compares data from Sonarr/Radarr instances to
-libraries in Plex/Emby and fixes any mismatches created by the agents used.
+Matcharr - Compare Sonarr/Radarr data to Plex libraries and fix mismatches.
 """
 
 import json
 import time
 import sys
-import pkg_resources
+from tqdm import tqdm
+from datetime import datetime
 
-from plexapi.server import PlexServer
-from classes.arr import Arr
-from classes.embydb import EmbyDB
-from utils.emby import load_emby_data, arr_find_emby_id, emby_compare_media
-from utils.plex import load_plex_data, check_duplicate, arr_find_plex_id, plex_compare_media
-from utils.arr import parse_arr_data, get_arrpaths, check_faulty
-from utils.base import timeoutput, giefbar, normalize_path
-from utils.logging import setup_logging, get_logger
+from arr import fetch_all_instances
+from plex import fetch_plex_libraries, normalize_plex_paths, update_plex_match, normalize_path
 
-# TODO add logging
-#  add validation for Arr/Plex/Emby config entries
-#  add check for empty libraries in Plex/Emby
-#  add support for anime (tentative)
-#  add support for multiple Plex/Emby instances (tentative)
-#  add support for forcing an agent for library types
-#  add dry-run option
-#  add support for specifying path mapping for media server
 
-runtime = time.time()
+def timeoutput():
+    """Return formatted timestamp for logging."""
+    return datetime.now().strftime('%d %b %Y %H:%M:%S')
 
-# Logging
-logger = setup_logging()
-logger.info("Running Matcharr.")
-logger.debug("Using PlexAPI version %s", pkg_resources.get_distribution("plexapi").version)
-logger.debug("Using requests version %s", pkg_resources.get_distribution("requests").version)
-logger.debug("Using pandas version %s", pkg_resources.get_distribution("pandas").version)
-logger.debug("Using tqdm version %s", pkg_resources.get_distribution("tqdm").version)
 
-# Load configuration
-config = json.load(open("config.json"))
-sonarr_config = config["sonarr"].keys()
-logger.debug("Sonarr config: %s", sonarr_config)
-radarr_config = config["radarr"].keys()
-logger.debug("Radarr config: %s", radarr_config)
-delay = config["delay"]
-logger.debug("Plex delay: %s", delay)
-emby_enabled = config["emby_enabled"]
-logger.debug("Emby enabled: %s", emby_enabled)
-plex_enabled = config["plex_enabled"]
-logger.debug("Plex enabled: %s", plex_enabled)
-plex_sections, emby_sections, sonarrs_config, radarrs_config = dict(), dict(), dict(), dict()
-
-for sonarr in sonarr_config:
-    sonarrs_config[sonarr] = config["sonarr"][sonarr]
-
-for radarr in radarr_config:
-    radarrs_config[radarr] = config["radarr"][radarr]
-
-if not bool(radarrs_config.keys()) and not bool(sonarrs_config.keys()):
-    print(f'{timeoutput()} - No Arrs configured - Exiting.')
+def main():
+    start_time = time.time()
+    
+    print(f"{timeoutput()} - Starting Matcharr")
+    
+    # Load configuration
+    try:
+        with open("config.json", "r") as f:
+            config = json.load(f)
+    except FileNotFoundError:
+        print(f"{timeoutput()} - ERROR: config.json not found")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"{timeoutput()} - ERROR: Invalid config.json: {e}")
+        sys.exit(1)
+    
+    # Validate config
+    if not config.get("plex_url") or not config.get("plex_token"):
+        print(f"{timeoutput()} - ERROR: Plex URL and token are required")
+        sys.exit(1)
+    
+    # Fetch data from Sonarr and Radarr
+    print(f"{timeoutput()} - Fetching data from Sonarr and Radarr...")
+    
+    sonarr_data = {}
+    radarr_data = {}
+    
+    if config.get("sonarr"):
+        for instance_name in tqdm(config["sonarr"].keys(), desc="Loading Sonarr instances"):
+            sonarr_data.update(fetch_all_instances(config, "sonarr"))
+    
+    if config.get("radarr"):
+        for instance_name in tqdm(config["radarr"].keys(), desc="Loading Radarr instances"):
+            radarr_data.update(fetch_all_instances(config, "radarr"))
+    
+    total_sonarr = sum(len(items) for items in sonarr_data.values()) if sonarr_data else 0
+    total_radarr = sum(len(items) for items in radarr_data.values()) if radarr_data else 0
+    
+    print(f"{timeoutput()} - Loaded {total_sonarr} shows from Sonarr, {total_radarr} movies from Radarr")
+    
+    if total_sonarr == 0 and total_radarr == 0:
+        print(f"{timeoutput()} - No data found in Sonarr or Radarr. Exiting.")
+        sys.exit(0)
+    
+    # Fetch data from Plex
+    print(f"{timeoutput()} - Fetching data from Plex...")
+    plex_data = fetch_plex_libraries(config)
+    
+    # Apply path mappings to Plex data
+    plex_data_mapped = normalize_plex_paths(plex_data, config)
+    
+    plex_movies = len(plex_data_mapped['movies'])
+    plex_shows = len(plex_data_mapped['shows'])
+    print(f"{timeoutput()} - Loaded {plex_movies} movies and {plex_shows} TV shows from Plex")
+    
+    # Track statistics
+    stats = {
+        'movies_matched': 0,
+        'movies_updated': 0,
+        'movies_already_correct': 0,
+        'movies_not_found': 0,
+        'shows_matched': 0,
+        'shows_updated': 0,
+        'shows_already_correct': 0,
+        'shows_not_found': 0
+    }
+    
+    # Process Radarr movies against Plex
+    print(f"{timeoutput()} - Processing movies...")
+    for instance_name, movies in radarr_data.items():
+        for movie in tqdm(movies, desc=f"Checking {instance_name}"):
+            arr_path = normalize_path(movie['path'])
+            arr_id = movie['id']
+            arr_title = movie['title']
+            
+            # Find matching Plex movie by path
+            plex_item = plex_data_mapped['movies'].get(arr_path)
+            
+            if not plex_item:
+                stats['movies_not_found'] += 1
+                continue
+            
+            stats['movies_matched'] += 1
+            
+            # Check if correct TMDB ID is already in Plex
+            if arr_id in plex_item['tmdb_ids']:
+                stats['movies_already_correct'] += 1
+                continue
+            
+            # Update Plex with correct TMDB ID
+            success = update_plex_match(
+                config,
+                plex_item['ratingKey'],
+                "movie",
+                arr_id,
+                arr_title,
+                config.get('delay', 10)
+            )
+            
+            if success:
+                stats['movies_updated'] += 1
+            else:
+                print(f"{timeoutput()} - WARNING: Failed to update movie: {arr_title}")
+    
+    # Process Sonarr shows against Plex
+    print(f"{timeoutput()} - Processing TV shows...")
+    for instance_name, shows in sonarr_data.items():
+        for show in tqdm(shows, desc=f"Checking {instance_name}"):
+            arr_path = normalize_path(show['path'])
+            arr_id = show['id']
+            arr_title = show['title']
+            
+            # Find matching Plex show by path
+            plex_item = plex_data_mapped['shows'].get(arr_path)
+            
+            if not plex_item:
+                stats['shows_not_found'] += 1
+                continue
+            
+            stats['shows_matched'] += 1
+            
+            # Check if correct TVDB ID is already in Plex
+            if arr_id in plex_item['tvdb_ids']:
+                stats['shows_already_correct'] += 1
+                continue
+            
+            # Update Plex with correct TVDB ID
+            success = update_plex_match(
+                config,
+                plex_item['ratingKey'],
+                "show",
+                arr_id,
+                arr_title,
+                config.get('delay', 10)
+            )
+            
+            if success:
+                stats['shows_updated'] += 1
+            else:
+                print(f"{timeoutput()} - WARNING: Failed to update show: {arr_title}")
+    
+    # Print summary
+    total_time = round(time.time() - start_time, 2)
+    
+    print("\n" + "=" * 60)
+    print(f"{timeoutput()} - Matcharr Complete!")
+    print("=" * 60)
+    print("\nMOVIES:")
+    print(f"  Matched by path:     {stats['movies_matched']}")
+    print(f"  Already correct:     {stats['movies_already_correct']}")
+    print(f"  Updated:             {stats['movies_updated']}")
+    print(f"  Not found in Plex:   {stats['movies_not_found']}")
+    print("\nTV SHOWS:")
+    print(f"  Matched by path:     {stats['shows_matched']}")
+    print(f"  Already correct:     {stats['shows_already_correct']}")
+    print(f"  Updated:             {stats['shows_updated']}")
+    print(f"  Not found in Plex:   {stats['shows_not_found']}")
+    print("\n" + "=" * 60)
+    print(f"{timeoutput()} - Total execution time: {total_time} seconds")
+    print("=" * 60)
+    
     sys.exit(0)
 
-# Load data from Arr instances.
-media = {"sonarr": {}, "radarr": {}}
-paths = {"sonarr": {}, "radarr": {}}
 
-if bool(sonarrs_config.keys()):
-    for sonarr in giefbar(sonarrs_config.keys(),
-                          f'{timeoutput()} - Loading data from Sonarr instances'):
-        media["sonarr"][sonarr] = Arr(sonarrs_config[sonarr]["url"],
-                                      sonarrs_config[sonarr]["apikey"],
-                                      "series").data
-        paths["sonarr"][sonarr] = Arr(sonarrs_config[sonarr]["url"],
-                                      sonarrs_config[sonarr]["apikey"],
-                                      "series").paths
-
-if bool(radarrs_config.keys()):
-    for radarr in giefbar(radarrs_config.keys(),
-                          f'{timeoutput()} - Loading data from Radarr instances'):
-        media["radarr"][radarr] = Arr(radarrs_config[radarr]["url"],
-                                      radarrs_config[radarr]["apikey"],
-                                      "movie").data
-        paths["radarr"][radarr] = Arr(radarrs_config[radarr]["url"],
-                                      radarrs_config[radarr]["apikey"],
-                                      "movie").paths
-
-sonarr_items, radarr_items, plexlibrary, embylibrary = dict(), dict(), dict(), dict()
-
-parse_arr_data(media, sonarr_items, radarr_items, config)
-arrpaths = get_arrpaths(paths, config)
-
-# INFO level logs go to file only (not console)
-logger.info("Data loaded from Arr instances:")
-logger.info(f"  Sonarr instances: {list(sonarr_items.keys())} with {sum(len(items) for items in sonarr_items.values()) if sonarr_items else 0} total items")
-logger.info(f"  Radarr instances: {list(radarr_items.keys())} with {sum(len(items) for items in radarr_items.values()) if radarr_items else 0} total items")
-logger.debug(f"  Sonarr items sample: {list(sonarr_items.values())[0][0].title if sonarr_items else 'None'}")
-logger.debug(f"  Radarr items sample: {list(radarr_items.values())[0][0].title if radarr_items else 'None'}")
-
-# Check for duplicate entries in Arr instances.
-check_faulty(radarrs_config, sonarrs_config, radarr_items, sonarr_items)
-
-if plex_enabled:
-    # Load data from Plex.
-    logger.info("Connecting to Plex...")
-    server = PlexServer(config["plex_url"], config["plex_token"])
-    server_sections = server.library.sections()
-    logger.info(f"Found {len(server_sections)} Plex sections")
-
-    plex_library_paths, arr_plex_match = dict(), dict()
-
-    for section in server_sections:
-        plex_library_paths[section.key] = dict(enumerate(section.locations))
-        logger.debug(f"  Section {section.title} (ID: {section.key}) has paths: {list(section.locations)}")
-    
-    arr_plex_match = {}
-    arr_find_plex_id(arrpaths, arr_plex_match, plex_library_paths, plex_sections, config)
-
-    # INFO level logs go to file only
-    logger.info("Plex path matching results:")
-    for arrtype in arr_plex_match:
-        for instance in arr_plex_match[arrtype]:
-            logger.info(f"  {arrtype} instance '{instance}' matched to {len(arr_plex_match[arrtype][instance])} Plex libraries")
-
-    # Check for duplicate entries in Plex.
-    DUPLICATE = check_duplicate(server, plex_sections, config, delay)
-    if DUPLICATE > 0:
-        logger.info(f"Found {DUPLICATE} duplicate items in Plex, reloading...")
-
-    # Reload Plex data if duplicate items were found in Plex.
-    if DUPLICATE > 0:
-        plexlibrary = {}
-        server.reload()
-
-    load_plex_data(server, plex_sections, plexlibrary, config)
-
-    # DEBUG: Log Radarr data structure before comparison
-    logger.debug(f"Radarr items structure: {list(radarr_items.keys())}")
-    if radarr_items:
-        for instance, movies in radarr_items.items():
-            logger.debug(f"  Radarr instance '{instance}' has {len(movies)} movies")
-            if movies:
-                logger.debug(f"    First movie: {movies[0].title} (TMDb: {movies[0].id})")
-
-    # INFO level logs go to file only
-    logger.info("Plex library data loaded:")
-    for section_id in plexlibrary:
-        logger.info(f"  Section ID {section_id}: {len(plexlibrary[section_id])} items")
-
-    # Check for mismatched entries and correct them.
-    PLEX_FIXED_MATCHES = 0
-    PLEX_FIXED_MATCHES += plex_compare_media(arr_plex_match,
-                                             sonarr_items,
-                                             radarr_items,
-                                             plexlibrary,
-                                             config,
-                                             delay)
-    print(f"{timeoutput()} - Number of fixed matches in Plex: {PLEX_FIXED_MATCHES}")
-
-if emby_enabled:
-    # Load data from Emby.
-    logger.info("Connecting to Emby...")
-    emby_library_paths = EmbyDB.libraries(config)
-    emby_sections = EmbyDB.sections(config)
-    load_emby_data(config, emby_sections, embylibrary)
-
-    arr_emby_match = {}
-    arr_find_emby_id(arrpaths, arr_emby_match, emby_library_paths, config)
-
-    # Check for mismatched entries and correct them.
-    EMBY_FIXED_MATCHES = 0
-    EMBY_FIXED_MATCHES += emby_compare_media(arr_emby_match,
-                                             sonarr_items,
-                                             radarr_items,
-                                             embylibrary,
-                                             config)
-    print(f"{timeoutput()} - Number of fixed matches in Emby: {EMBY_FIXED_MATCHES}")
-
-# INFO level logs go to file only
-logger.info("Final statistics:")
-logger.info(f"  Total execution time: {round(time.time() - runtime, 2)} seconds")
-if plex_enabled:
-    logger.info(f"  Plex fixed matches: {PLEX_FIXED_MATCHES}")
-if emby_enabled:
-    logger.info(f"  Emby fixed matches: {EMBY_FIXED_MATCHES}")
-
-print(f"{timeoutput()} - Running the program took {round(time.time() - runtime, 2)} seconds.")
-
-sys.exit(0)
+if __name__ == "__main__":
+    main()
