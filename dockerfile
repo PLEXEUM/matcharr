@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files (only root Python files now)
 COPY *.py ./
-COPY config.json ./
+COPY config.json.sample ./config.json
 
 # Create logs directory
 RUN mkdir -p /app/logs
