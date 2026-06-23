@@ -180,8 +180,25 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                         lookup = tmdb_lookup
                         id_type = "TMDb"
     
+                    matched = False
+    
+                    # Try ID lookup first
                     if str(items.id) in lookup:
                         plex_items = lookup[str(items.id)]
+                        matched = True
+    
+                    # For Sonarr only: if no TVDB ID match, try title matching
+                    if not matched and arrtype == "sonarr":
+                        logger.debug(f"TVDB ID not found for '{items.title}', trying title match...")
+                        for plex_item in library[library_id]:
+                            if items.title.lower() == plex_item.title.lower():
+                                plex_items = plex_item
+                                matched = True
+                                logger.debug(f"Found by title match: {items.title} -> {plex_items.title}")
+                                break
+    
+                    if matched:
+                        # ... rest of comparison logic (agent checks, plex_match calls, etc.)
             
                         # DEBUG only - goes to file
                         if arrtype == "sonarr":
