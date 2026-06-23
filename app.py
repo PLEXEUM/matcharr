@@ -5,12 +5,16 @@ Matcharr - Compare Sonarr/Radarr data to Plex libraries and fix mismatches.
 import json
 import time
 import sys
+import logging  # <-- ADD THIS
 from tqdm import tqdm
 from datetime import datetime
 
 from arr import fetch_all_instances
-from plex import fetch_plex_libraries, normalize_plex_paths, update_plex_match, normalize_path
+from plex import fetch_plex_libraries, normalize_plex_paths, update_plex_match, normalize_path, map_plex_paths  # <-- ADD map_plex_paths
 
+# <-- ADD THESE TWO LINES BELOW -->
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def timeoutput():
     """Return formatted timestamp for logging."""
