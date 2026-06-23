@@ -169,6 +169,9 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                 logger.debug(f"Built TMDb lookup map with {len(tmdb_lookup)} entries")
                 logger.debug(f"Built TVDB lookup map with {len(tvdb_lookup)} entries")
                 logger.debug(f"Built Path lookup map with {len(path_lookup)} entries")
+                # ADD THIS LINE:
+                if len(tvdb_lookup) == 0:
+                    logger.info("Plex TV shows have NO TVDB IDs - using path matching fallback for Sonarr")
                 
                 # Log first 5 Plex paths for debugging
                 logger.debug(f"=== DEBUG: First 5 Plex paths in library {library_id} ===")
@@ -200,6 +203,19 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                                     plex_items = plex_item
                                     matched = True
                                     logger.debug(f"Found by PATH for Sonarr: {items.title} -> {plex_items.title}")
+                                    # Add the TVDB ID to Plex since it was missing
+                                    try:
+                                        plex_match(config["plex_url"],
+                                                config["plex_token"],
+                                                "plextvdb",
+                                                plex_item.metadataid,
+                                                items.id,
+                                                items.title,
+                                                delay)
+                                        time.sleep(delay)
+                                        logger.info(f"Added TVDB ID {items.id} to Plex for {items.title}")
+                                    except TypeError:
+                                        tqdm.write(f"{timeoutput()} - Plex metadata ID appears to be missing.")
                                     break
 
                     if matched and plex_items:
