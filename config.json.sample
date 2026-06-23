@@ -1,0 +1,20 @@
+{
+  "plex_url": "https://plex.domain.tld",
+  "plex_token": "",
+  "delay": 10,
+  "path_mappings": {
+    "/mnt/unionfs/Media/": "/data/"
+  },
+  "radarr": {
+    "radarr": {
+      "url": "https://radarr.domain.tld",
+      "apikey": ""
+    }
+  },
+  "sonarr": {
+    "sonarr": {
+      "url": "https://sonarr.domain.tld",
+      "apikey": ""
+    }
+  }
+}
