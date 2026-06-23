@@ -41,6 +41,7 @@ def get_file_handler():
         encoding='utf-8'
     )
     file_handler.setFormatter(FORMATTER)
+    file_handler.setLevel(logging.DEBUG)  # ← ADD THIS LINE
     return file_handler
 
 
