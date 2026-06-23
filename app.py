@@ -38,6 +38,14 @@ def main():
         print(f"{timeoutput()} - ERROR: Plex URL and token are required")
         sys.exit(1)
     
+    # Get root folders from config (like Gaparr)
+    sonarr_root = config.get("sonarr_root_folder", "")
+    radarr_root = config.get("radarr_root_folder", "")
+    
+    if not sonarr_root and not radarr_root:
+        print(f"{timeoutput()} - ERROR: sonarr_root_folder and/or radarr_root_folder are required")
+        sys.exit(1)
+    
     # Fetch data from Sonarr and Radarr
     print(f"{timeoutput()} - Fetching data from Sonarr and Radarr...")
     
@@ -65,8 +73,8 @@ def main():
     print(f"{timeoutput()} - Fetching data from Plex...")
     plex_data = fetch_plex_libraries(config)
     
-    # Apply path mappings to Plex data
-    plex_data_mapped = normalize_plex_paths(plex_data, config)
+    # Apply root folder mapping (like Gaparr's root_folder)
+    plex_data_mapped = map_plex_paths(plex_data, sonarr_root, radarr_root, config)
     
     plex_movies = len(plex_data_mapped['movies'])
     plex_shows = len(plex_data_mapped['shows'])
@@ -92,8 +100,21 @@ def main():
             arr_id = movie['id']
             arr_title = movie['title']
             
-            # Find matching Plex movie by path
-            plex_item = plex_data_mapped['movies'].get(arr_path)
+            # For Radarr, only match if path starts with radarr_root_folder
+            if radarr_root and not arr_path.startswith(normalize_path(radarr_root)):
+                logger.debug(f"Skipping {arr_title}: path doesn't start with radarr_root_folder")
+                stats['movies_not_found'] += 1
+                continue
+            
+            # Remove root folder from path for matching
+            match_path = arr_path.replace(normalize_path(radarr_root), "").lstrip('/')
+            
+            # Find matching Plex movie by path (search in mapped paths)
+            plex_item = None
+            for plex_path, plex_data_item in plex_data_mapped['movies'].items():
+                if match_path in plex_path or plex_path.endswith(match_path):
+                    plex_item = plex_data_item
+                    break
             
             if not plex_item:
                 stats['movies_not_found'] += 1
@@ -129,8 +150,21 @@ def main():
             arr_id = show['id']
             arr_title = show['title']
             
-            # Find matching Plex show by path
-            plex_item = plex_data_mapped['shows'].get(arr_path)
+            # For Sonarr, only match if path starts with sonarr_root_folder
+            if sonarr_root and not arr_path.startswith(normalize_path(sonarr_root)):
+                logger.debug(f"Skipping {arr_title}: path doesn't start with sonarr_root_folder")
+                stats['shows_not_found'] += 1
+                continue
+            
+            # Remove root folder from path for matching
+            match_path = arr_path.replace(normalize_path(sonarr_root), "").lstrip('/')
+            
+            # Find matching Plex show by path (search in mapped paths)
+            plex_item = None
+            for plex_path, plex_data_item in plex_data_mapped['shows'].items():
+                if match_path in plex_path or plex_path.endswith(match_path):
+                    plex_item = plex_data_item
+                    break
             
             if not plex_item:
                 stats['shows_not_found'] += 1

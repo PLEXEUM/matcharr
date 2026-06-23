@@ -17,6 +17,42 @@ def normalize_path(path):
     return normalized.rstrip('/')
 
 
+# ===== ADD THIS FUNCTION HERE =====
+def map_plex_paths(plex_data, sonarr_root, radarr_root, config):
+    """
+    Map Plex paths to match Arr root folder structure.
+    Like Gaparr's root_folder approach.
+    """
+    mapped_data = {'movies': {}, 'shows': {}}
+    
+    # Normalize root paths
+    sonarr_root_norm = normalize_path(sonarr_root) if sonarr_root else ""
+    radarr_root_norm = normalize_path(radarr_root) if radarr_root else ""
+    
+    for media_type in ['movies', 'shows']:
+        for original_path, item_data in plex_data[media_type].items():
+            mapped_path = normalize_path(original_path)
+            
+            # Try to match against radarr_root_folder or sonarr_root_folder
+            if media_type == 'movies' and radarr_root_norm:
+                # If Plex path contains the radarr root, keep it as-is
+                if radarr_root_norm in mapped_path:
+                    mapped_data['movies'][mapped_path] = item_data
+                    continue
+            
+            if media_type == 'shows' and sonarr_root_norm:
+                # If Plex path contains the sonarr root, keep it as-is
+                if sonarr_root_norm in mapped_path:
+                    mapped_data['shows'][mapped_path] = item_data
+                    continue
+            
+            # If no root mapping applies, still include the path
+            mapped_data[media_type][mapped_path] = item_data
+    
+    return mapped_data
+# ===== END OF ADDED FUNCTION =====
+
+
 def fetch_plex_libraries(config):
     """
     Connect to Plex and fetch all movie and TV show libraries.
