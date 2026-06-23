@@ -25,7 +25,7 @@ logging.basicConfig(
     handlers=[
         RotatingFileHandler(
             os.path.join(LOG_DIR, "matcharr.log"),
-            maxBytes=10485760,  # 10MB
+            maxBytes=52428800,  # 50MB
             backupCount=5
         ),
         logging.StreamHandler(sys.stdout)
