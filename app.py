@@ -6,15 +6,33 @@ import json
 import time
 import sys
 import logging  # <-- ADD THIS
+import os
+from logging.handlers import RotatingFileHandler
 from tqdm import tqdm
 from datetime import datetime
 
 from arr import fetch_all_instances
 from plex import fetch_plex_libraries, normalize_plex_paths, update_plex_match, normalize_path, map_plex_paths  # <-- ADD map_plex_paths
 
-# <-- ADD THESE TWO LINES BELOW -->
-logging.basicConfig(level=logging.INFO)
+# Create logs directory if it doesn't exist
+LOG_DIR = "/app/logs"
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# Configure logging to both file and console
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        RotatingFileHandler(
+            os.path.join(LOG_DIR, "matcharr.log"),
+            maxBytes=10485760,  # 10MB
+            backupCount=5
+        ),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 logger = logging.getLogger(__name__)
+
 
 def timeoutput():
     """Return formatted timestamp for logging."""

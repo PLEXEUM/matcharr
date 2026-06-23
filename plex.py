@@ -144,7 +144,7 @@ def update_plex_match(config, rating_key, media_type, media_id, title, delay):
         guid = f"tvdb://{media_id}?lang=en"
         agent_type = "TVDB"
     
-    url = f"{config['plex_url']}/library/metadata/{ratingKey}/match"
+    url = f"{config['plex_url']}/library/metadata/{rating_key}/match"
     params = {
         'X-Plex-Token': config['plex_token'],
         'guid': guid,
