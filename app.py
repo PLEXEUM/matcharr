@@ -27,8 +27,8 @@ logging.basicConfig(
             os.path.join(LOG_DIR, "matcharr.log"),
             maxBytes=52428800,  # 50MB
             backupCount=5
-        ),
-        logging.StreamHandler(sys.stdout)
+        )
+        # NO StreamHandler - console stays clean!
     ]
 )
 logger = logging.getLogger(__name__)
@@ -42,22 +42,22 @@ def timeoutput():
 def main():
     start_time = time.time()
     
-    print(f"{timeoutput()} - Starting Matcharr")
+    logger.info(f"{timeoutput()} - Starting Matcharr")
     
     # Load configuration
     try:
         with open("config.json", "r") as f:
             config = json.load(f)
     except FileNotFoundError:
-        print(f"{timeoutput()} - ERROR: config.json not found")
+        logger.error(f"{timeoutput()} - ERROR: config.json not found")
         sys.exit(1)
     except json.JSONDecodeError as e:
-        print(f"{timeoutput()} - ERROR: Invalid config.json: {e}")
+        logger.error(f"{timeoutput()} - ERROR: Invalid config.json: {e}")
         sys.exit(1)
     
     # Validate config
     if not config.get("plex_url") or not config.get("plex_token"):
-        print(f"{timeoutput()} - ERROR: Plex URL and token are required")
+        logger.error(f"{timeoutput()} - ERROR: Plex URL and token are required")
         sys.exit(1)
     
     # Get root folders from config (like Gaparr)
@@ -65,11 +65,11 @@ def main():
     radarr_root = config.get("radarr_root_folder", "")
     
     if not sonarr_root and not radarr_root:
-        print(f"{timeoutput()} - ERROR: sonarr_root_folder and/or radarr_root_folder are required")
+        logger.error(f"{timeoutput()} - ERROR: sonarr_root_folder and/or radarr_root_folder are required")
         sys.exit(1)
     
     # Fetch data from Sonarr and Radarr
-    print(f"{timeoutput()} - Fetching data from Sonarr and Radarr...")
+    logger.info(f"{timeoutput()} - Fetching data from Sonarr and Radarr...")
     
     sonarr_data = {}
     radarr_data = {}
@@ -85,14 +85,14 @@ def main():
     total_sonarr = sum(len(items) for items in sonarr_data.values()) if sonarr_data else 0
     total_radarr = sum(len(items) for items in radarr_data.values()) if radarr_data else 0
     
-    print(f"{timeoutput()} - Loaded {total_sonarr} shows from Sonarr, {total_radarr} movies from Radarr")
+    logger.info(f"{timeoutput()} - Loaded {total_sonarr} shows from Sonarr, {total_radarr} movies from Radarr")
     
     if total_sonarr == 0 and total_radarr == 0:
-        print(f"{timeoutput()} - No data found in Sonarr or Radarr. Exiting.")
+        logger.info(f"{timeoutput()} - No data found in Sonarr or Radarr. Exiting.")
         sys.exit(0)
     
     # Fetch data from Plex
-    print(f"{timeoutput()} - Fetching data from Plex...")
+    logger.info(f"{timeoutput()} - Fetching data from Plex...")
     plex_data = fetch_plex_libraries(config)
     
     # Apply root folder mapping (like Gaparr's root_folder)
@@ -100,7 +100,7 @@ def main():
     
     plex_movies = len(plex_data_mapped['movies'])
     plex_shows = len(plex_data_mapped['shows'])
-    print(f"{timeoutput()} - Loaded {plex_movies} movies and {plex_shows} TV shows from Plex")
+    logger.info(f"{timeoutput()} - Loaded {plex_movies} movies and {plex_shows} TV shows from Plex")
     
     # Track statistics
     stats = {
@@ -115,7 +115,7 @@ def main():
     }
     
     # Process Radarr movies against Plex
-    print(f"{timeoutput()} - Processing movies...")
+    logger.info(f"{timeoutput()} - Processing movies...")
     for instance_name, movies in radarr_data.items():
         for movie in tqdm(movies, desc=f"Checking {instance_name}"):
             arr_path = normalize_path(movie['path'])
@@ -162,10 +162,10 @@ def main():
             if success:
                 stats['movies_updated'] += 1
             else:
-                print(f"{timeoutput()} - WARNING: Failed to update movie: {arr_title}")
+                logger.warning(f"{timeoutput()} - WARNING: Failed to update movie: {arr_title}")
     
     # Process Sonarr shows against Plex
-    print(f"{timeoutput()} - Processing TV shows...")
+    logger.info(f"{timeoutput()} - Processing TV shows...")
     for instance_name, shows in sonarr_data.items():
         for show in tqdm(shows, desc=f"Checking {instance_name}"):
             arr_path = normalize_path(show['path'])
@@ -212,7 +212,7 @@ def main():
             if success:
                 stats['shows_updated'] += 1
             else:
-                print(f"{timeoutput()} - WARNING: Failed to update show: {arr_title}")
+                logger.warning(f"{timeoutput()} - WARNING: Failed to update show: {arr_title}")
     
     # Print summary
     total_time = round(time.time() - start_time, 2)
