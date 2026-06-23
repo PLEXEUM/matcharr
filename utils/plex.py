@@ -17,8 +17,8 @@ def load_plex_data(server, plex_sections, plexlibrary, config):
     for sectionid in plex_sections.values():
         section = server.library.sectionByID(sectionid)
         
-        # FIX 1: Add debug logging for section loading
-        logger.info(f"📂 Loading Plex section: {section.title} (ID: {sectionid}, Type: {section.type})")
+        # DEBUG only - goes to file, not console
+        logger.debug(f"Loading Plex section: {section.title} (ID: {sectionid}, Type: {section.type})")
         
         # Get the root items (shows for TV, movies for movies)
         if section.type == "show":
@@ -58,16 +58,16 @@ def check_duplicate(server, plex_sections, config, delay):
 
 
 def arr_find_plex_id(arrpaths, arr_plex_match, plex_library_paths, plex_sections, config):
-    # FIX 2: Add debug logging for path matching
-    logger.info(f"🔍 Finding Plex IDs for arr paths")
+    # DEBUG only - goes to file
+    logger.debug(f"Finding Plex IDs for arr paths")
     
     for arrtype in arrpaths.keys():
-        logger.info(f"  📁 Processing {arrtype} instances: {list(arrpaths[arrtype].keys())}")
+        logger.debug(f"Processing {arrtype} instances: {list(arrpaths[arrtype].keys())}")
         arr_plex_match[arrtype] = {}
         
         for arr in arrpaths[arrtype].keys():
             arr_plex_match[arrtype][arr] = {}
-            logger.debug(f"    🔎 Matching paths for {arr} ({len(arrpaths[arrtype][arr])} paths)")
+            logger.debug(f"Matching paths for {arr} ({len(arrpaths[arrtype][arr])} paths)")
             
             for arr_path in arrpaths[arrtype][arr].values():
                 for library in plex_library_paths.keys():
@@ -75,57 +75,77 @@ def arr_find_plex_id(arrpaths, arr_plex_match, plex_library_paths, plex_sections
                         if arr_path.rstrip("/") == map_path(config, posixpath.join(plex_path, '')).rstrip("/"):
                             arr_plex_match[arrtype][arr][arr_path] = {"plex_library_id": library}
                             plex_sections[library] = library
-                            logger.debug(f"      ✅ Matched path: {arr_path} -> Plex library {library}")
+                            logger.debug(f"Matched path: {arr_path} -> Plex library {library}")
                             break
 
 
 def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
     counter = 0
     
-    # FIX 3: Properly count total items across all instances
+    # DEBUG only - goes to file
     total_sonarr = sum(len(items) for items in sonarr.values()) if sonarr else 0
     total_radarr = sum(len(items) for items in radarr.values()) if radarr else 0
-    
-    # FORCE LOG - Show what's being compared
-    logger.info(f"📊 Starting comparison - Radarr movies: {total_radarr} items, Sonarr shows: {total_sonarr} items")
-    logger.info(f"  📁 Sonarr instances: {list(sonarr.keys()) if sonarr else []}")
-    logger.info(f"  📁 Radarr instances: {list(radarr.keys()) if radarr else []}")
+    logger.debug(f"Starting comparison - Radarr movies: {total_radarr} items, Sonarr shows: {total_sonarr} items")
+    logger.debug(f"Sonarr instances: {list(sonarr.keys()) if sonarr else []}")
+    logger.debug(f"Radarr instances: {list(radarr.keys()) if radarr else []}")
     
     for arrtype in arr_plex_match.keys():
         if arrtype == "radarr":
             agent = "themoviedb"
             arr = radarr
-            logger.info(f"🎬 Comparing Radarr instances: {list(arr.keys()) if arr else []}")
+            logger.debug(f"Comparing Radarr instances: {list(arr.keys()) if arr else []}")
         elif arrtype == "sonarr":
             agent = "thetvdb"
             arr = sonarr
-            logger.info(f"📺 Comparing Sonarr instances: {list(arr.keys()) if arr else []}")
+            logger.debug(f"Comparing Sonarr instances: {list(arr.keys()) if arr else []}")
             
         for arrinstance in arr_plex_match[arrtype].keys():
-            # FIX 4: Check if instance exists in arr data
+            # Check if instance exists in arr data
             if arrinstance not in arr:
-                logger.warning(f"⚠️ Instance '{arrinstance}' not found in {arrtype} data - available: {list(arr.keys()) if arr else []}")
+                logger.warning(f"Instance '{arrinstance}' not found in {arrtype} data - available: {list(arr.keys()) if arr else []}")
                 continue
             
-            # FIX 5: Log the instance being processed
-            logger.info(f"🔍 Processing {arrinstance} with {len(arr[arrinstance])} items")
+            logger.debug(f"Processing {arrinstance} with {len(arr[arrinstance])} items")
             
             if len(arr[arrinstance]) == 0:
-                logger.warning(f"⚠️ No items found for {arrinstance}")
+                logger.warning(f"No items found for {arrinstance}")
                 continue
+            
+            # Log first 5 Arr paths for debugging
+            logger.debug(f"=== DEBUG: First 5 {arrtype} paths from {arrinstance} ===")
+            for idx, item in enumerate(arr[arrinstance][:5]):
+                logger.debug(f"  {idx}: {item.title} -> {item.mappedpath}")
                 
             for folder in arr_plex_match[arrtype][arrinstance].values():
-                # FIX 6: Properly iterate over arr items
+                logger.debug(f"Checking folder: {folder}")
+                library_id = folder.get('plex_library_id')
+                logger.debug(f"Library ID: {library_id}")
+                
+                if library_id not in library:
+                    logger.warning(f"Library ID {library_id} not found in library data!")
+                    continue
+                    
+                logger.debug(f"Library has {len(library[library_id])} items")
+                
+                # Log first 5 Plex paths for debugging
+                logger.debug(f"=== DEBUG: First 5 Plex paths in library {library_id} ===")
+                for idx, plex_item in enumerate(library[library_id][:5]):
+                    logger.debug(f"  {idx}: {plex_item.title} -> {plex_item.mappedpath}")
+                
+                logger.debug(f"Arr items count: {len(arr[arrinstance])}")
+                
                 for items in giefbar(arr[arrinstance], f'{timeoutput()} - Checking Plex against {arrinstance}'):
+                    path_matched = False
                     
-                    # FORCE LOG for first item only
-                    if items == arr[arrinstance][0]:
-                        logger.info(f"🔍 First comparison: {items.title} (Arr {arrtype} ID: {items.id})")
-                    
-                    for plex_items in library[folder.get("plex_library_id")]:
+                    for plex_items in library[library_id]:
+                        # DEBUG: Log the paths being compared
+                        logger.debug(f"Path check - Arr: '{items.mappedpath}' vs Plex: '{plex_items.mappedpath}'")
+                        logger.debug(f"Path check - Plex dirname: '{posixpath.dirname(plex_items.mappedpath)}'")
+                        
                         if items.mappedpath in [posixpath.dirname(plex_items.mappedpath), plex_items.mappedpath]:
+                            path_matched = True
                             
-                            # Debug logging - shows every comparison
+                            # DEBUG only - goes to file
                             if arrtype == "sonarr":
                                 logger.debug(f"Comparing: {items.title} (Sonarr TVDB ID: {items.id}) vs Plex: {plex_items.title} (Plex TVDB IDs: {plex_items.tvdb})")
                             elif arrtype == "radarr":
@@ -134,6 +154,7 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                             if plex_items.agent == "imdb":
                                 if items.imdb == plex_items.id:
                                     break
+                                # Only WARNING+ shows in console, so these tqdm writes still show
                                 tqdm.write(
                                     f"{timeoutput()} - Plex metadata item {plex_items.metadataid} with imdb ID:{plex_items.id} did not match {arrinstance} imdb ID:{items.imdb}")
                                 tqdm.write(
@@ -161,7 +182,8 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                                             match_found = 1
                                             break
                                     if not match_found:
-                                        logger.warning(f"❌ MISMATCH (Movie): {items.title} (Arr ID: {items.id}) vs Plex TMDB IDs: {plex_items.tmdb}")
+                                        # WARNING shows in console and file
+                                        logger.warning(f"MISMATCH (Movie): {items.title} (Arr ID: {items.id}) vs Plex TMDB IDs: {plex_items.tmdb}")
                                         tqdm.write(
                                             f"{timeoutput()} - Plex metadata item {plex_items.metadataid} with tmdb ID:{plex_items.tmdb} did not match {arrinstance} tmdb ID:{items.id}")
                                         tqdm.write(
@@ -185,7 +207,8 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                                             match_found = 1
                                             break
                                     if not match_found:
-                                        logger.warning(f"❌ MISMATCH (TV Show): {items.title} (Arr ID: {items.id}) vs Plex TVDB IDs: {plex_items.tvdb}")
+                                        # WARNING shows in console and file
+                                        logger.warning(f"MISMATCH (TV Show): {items.title} (Arr ID: {items.id}) vs Plex TVDB IDs: {plex_items.tvdb}")
                                         tqdm.write(
                                             f"{timeoutput()} - Plex metadata item {plex_items.metadataid} with tvdb ID:{plex_items.tvdb} did not match {arrinstance} tvdb ID:{items.id}")
                                         tqdm.write(
@@ -221,8 +244,10 @@ def plex_compare_media(arr_plex_match, sonarr, radarr, library, config, delay):
                                 except TypeError:
                                     tqdm.write(f"{timeoutput()} - Plex metadata ID appears to be missing.")
                                 counter += 1
-                                break
-    return counter
+                            break  # Break out of plex_items loop once we found and processed a match
+                    
+                    if not path_matched:
+                        logger.debug(f"No path match found for: {items.title} ({items.mappedpath})")
 
 
 # TODO add ability to use different language codes

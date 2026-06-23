@@ -89,8 +89,8 @@ sonarr_items, radarr_items, plexlibrary, embylibrary = dict(), dict(), dict(), d
 parse_arr_data(media, sonarr_items, radarr_items, config)
 arrpaths = get_arrpaths(paths, config)
 
-# FIX 1: Log the data structures after loading
-logger.info("📊 Data loaded from Arr instances:")
+# INFO level logs go to file only (not console)
+logger.info("Data loaded from Arr instances:")
 logger.info(f"  Sonarr instances: {list(sonarr_items.keys())} with {sum(len(items) for items in sonarr_items.values()) if sonarr_items else 0} total items")
 logger.info(f"  Radarr instances: {list(radarr_items.keys())} with {sum(len(items) for items in radarr_items.values()) if radarr_items else 0} total items")
 logger.debug(f"  Sonarr items sample: {list(sonarr_items.values())[0][0].title if sonarr_items else 'None'}")
@@ -101,10 +101,10 @@ check_faulty(radarrs_config, sonarrs_config, radarr_items, sonarr_items)
 
 if plex_enabled:
     # Load data from Plex.
-    logger.info("📺 Connecting to Plex...")
+    logger.info("Connecting to Plex...")
     server = PlexServer(config["plex_url"], config["plex_token"])
     server_sections = server.library.sections()
-    logger.info(f"📺 Found {len(server_sections)} Plex sections")
+    logger.info(f"Found {len(server_sections)} Plex sections")
 
     plex_library_paths, arr_plex_match = dict(), dict()
 
@@ -115,8 +115,8 @@ if plex_enabled:
     arr_plex_match = {}
     arr_find_plex_id(arrpaths, arr_plex_match, plex_library_paths, plex_sections, config)
 
-    # FIX 2: Log the matching results
-    logger.info("🔍 Plex path matching results:")
+    # INFO level logs go to file only
+    logger.info("Plex path matching results:")
     for arrtype in arr_plex_match:
         for instance in arr_plex_match[arrtype]:
             logger.info(f"  {arrtype} instance '{instance}' matched to {len(arr_plex_match[arrtype][instance])} Plex libraries")
@@ -124,7 +124,7 @@ if plex_enabled:
     # Check for duplicate entries in Plex.
     DUPLICATE = check_duplicate(server, plex_sections, config, delay)
     if DUPLICATE > 0:
-        logger.info(f"📊 Found {DUPLICATE} duplicate items in Plex, reloading...")
+        logger.info(f"Found {DUPLICATE} duplicate items in Plex, reloading...")
 
     # Reload Plex data if duplicate items were found in Plex.
     if DUPLICATE > 0:
@@ -133,8 +133,8 @@ if plex_enabled:
 
     load_plex_data(server, plex_sections, plexlibrary, config)
 
-    # FIX 3: Log the Plex library data
-    logger.info("📚 Plex library data loaded:")
+    # INFO level logs go to file only
+    logger.info("Plex library data loaded:")
     for section_id in plexlibrary:
         logger.info(f"  Section ID {section_id}: {len(plexlibrary[section_id])} items")
 
@@ -150,7 +150,7 @@ if plex_enabled:
 
 if emby_enabled:
     # Load data from Emby.
-    logger.info("🎬 Connecting to Emby...")
+    logger.info("Connecting to Emby...")
     emby_library_paths = EmbyDB.libraries(config)
     emby_sections = EmbyDB.sections(config)
     load_emby_data(config, emby_sections, embylibrary)
@@ -167,8 +167,8 @@ if emby_enabled:
                                              config)
     print(f"{timeoutput()} - Number of fixed matches in Emby: {EMBY_FIXED_MATCHES}")
 
-# FIX 4: Log final statistics
-logger.info("📊 Final statistics:")
+# INFO level logs go to file only
+logger.info("Final statistics:")
 logger.info(f"  Total execution time: {round(time.time() - runtime, 2)} seconds")
 if plex_enabled:
     logger.info(f"  Plex fixed matches: {PLEX_FIXED_MATCHES}")

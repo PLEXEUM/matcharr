@@ -29,8 +29,8 @@ class TeeLogger:
 def get_console_handler():
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(FORMATTER)
-    # FIX: Set DEBUG level for console handler to show all log messages
-    console_handler.setLevel(logging.DEBUG)
+    # Only show WARNING and above in console to keep tqdm clean
+    console_handler.setLevel(logging.WARNING)
     return console_handler
 
 
@@ -43,20 +43,21 @@ def get_file_handler():
         encoding='utf-8'
     )
     file_handler.setFormatter(FORMATTER)
+    # Log everything to file including DEBUG
     file_handler.setLevel(logging.DEBUG)
     return file_handler
 
 
 def setup_logging():
     """Set up logging to both console and file"""
-    # Redirect stdout to both console and file
+    # Redirect stdout to both console and file (for tqdm and prints)
     sys.stdout = TeeLogger(LOG_FILE)
     
     # Set up logging
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     logger.addHandler(get_file_handler())
-    logger.addHandler(get_console_handler())  # FIX: Actually add the console handler
+    logger.addHandler(get_console_handler())
     
     return logger
 
@@ -65,6 +66,6 @@ def get_logger(logger_name):
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.DEBUG)
     logger.addHandler(get_file_handler())
-    logger.addHandler(get_console_handler())  # FIX: Actually add the console handler
+    logger.addHandler(get_console_handler())
     logger.propagate = False
     return logger
