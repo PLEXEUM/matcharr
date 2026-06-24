@@ -171,21 +171,24 @@ def update_plex_match(config, rating_key, media_type, media_id, title, delay):
             response = requests.put(url, params=params, timeout=30)
             
             if response.status_code == 200:
-                print(f"✓ Updated {title} (RatingKey: {ratingKey}) to {agent_type} ID: {media_id}")
+                # --- SUCCESS! Log it, wait, and return True immediately ---
+                print(f"✓ Updated {title} (RatingKey: {rating_key}) to {agent_type} ID: {media_id}")
+                logger.info(f"Successfully updated {title} (RatingKey: {rating_key})") # Log to file as well
                 time.sleep(delay)
-                return True
+                return True  # <--- THIS IS THE KEY FIX: Exit the function on success
             else:
+                # --- Handle non-200 responses (e.g., 400, 404) ---
                 print(f"✗ Failed to update {title}: {response.status_code} - {response.text}")
-                # Log the full request for debugging
-                logger.debug(f"PUT {url} with params: {params}")
-                logger.debug(f"Response: {response.status_code} - {response.text}")
-                return False
+                logger.warning(f"Failed to update {title}: {response.status_code} - {response.text}")
+                return False  # <--- Exit the function on failure, no retry needed for this movie
                 
         except Exception as e:
+            # --- Handle network errors or timeouts ---
+            logger.error(f"Exception on attempt {attempt + 1} for {title}: {e}")
             if attempt == 2:
                 print(f"✗ Failed to update {title} after 3 attempts: {e}")
                 return False
-            time.sleep(2 ** attempt)
+            time.sleep(2 ** attempt)  # Exponential backoff for network issues
     
     return False
 
