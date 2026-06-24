@@ -65,23 +65,59 @@ def map_plex_paths(plex_data, sonarr_root, radarr_root, config):
 def fetch_plex_libraries(config):
     """
     Connect to Plex and fetch all movie and TV show libraries.
-    
-    Returns:
-        Dictionary with library data: {
-            'movies': {path: {'ratingKey': key, 'title': title, 'tmdb_ids': [ids], 'tvdb_ids': [ids]}},
-            'shows': {path: {'ratingKey': key, 'title': title, 'tmdb_ids': [ids], 'tvdb_ids': [ids]}}
-        }
+    Auto-detects movie and TV sections by type and path.
     """
     server = PlexServer(config["plex_url"], config["plex_token"])
     sections = server.library.sections()
     
     result = {'movies': {}, 'shows': {}}
     
+    # Get root folders from config
+    sonarr_root = normalize_path(config.get("sonarr_root_folder", ""))
+    radarr_root = normalize_path(config.get("radarr_root_folder", ""))
+    
     for section in sections:
-        if section.type == "movie":
+        section_paths = [normalize_path(p) for p in section.locations]
+        
+        # Check if this section matches the movie root folder
+        is_movie_section = False
+        is_show_section = False
+        
+        if section.type == "movie" and radarr_root:
+            # Check if any section path contains the radarr root
+            for path in section_paths:
+                if radarr_root in path or path in radarr_root:
+                    is_movie_section = True
+                    break
+            # Fallback: if section title contains "Movie"
+            if not is_movie_section and "movie" in section.title.lower():
+                is_movie_section = True
+        
+        if section.type == "show" and sonarr_root:
+            # Check if any section path contains the sonarr root
+            for path in section_paths:
+                if sonarr_root in path or path in sonarr_root:
+                    is_show_section = True
+                    break
+            # Fallback: if section title contains "TV" or "Show"
+            if not is_show_section and ("tv" in section.title.lower() or "show" in section.title.lower()):
+                is_show_section = True
+        
+        # Load items for matching sections
+        if is_movie_section:
+            logger.info(f"Auto-detected movie section: '{section.title}' (ID: {section.key})")
             result['movies'] = _load_plex_items(section, "movie")
-        elif section.type == "show":
+        elif is_show_section:
+            logger.info(f"Auto-detected TV section: '{section.title}' (ID: {section.key})")
             result['shows'] = _load_plex_items(section, "show")
+        else:
+            # Fallback: use type-based detection if no root matches
+            if section.type == "movie" and not result['movies']:
+                logger.info(f"Using movie section: '{section.title}' (ID: {section.key})")
+                result['movies'] = _load_plex_items(section, "movie")
+            elif section.type == "show" and not result['shows']:
+                logger.info(f"Using TV section: '{section.title}' (ID: {section.key})")
+                result['shows'] = _load_plex_items(section, "show")
     
     return result
 
@@ -179,7 +215,6 @@ def update_plex_match(config, rating_key, media_type, media_id, title, delay):
             if response.status_code == 200:
                 # --- SUCCESS! Log it, wait, and return True immediately ---
                 logger.info(f"✓ Updated {title} (RatingKey: {rating_key}) to {agent_type} ID: {media_id}")
-                logger.info(f"Successfully updated {title} (RatingKey: {rating_key})") # Log to file as well
                 time.sleep(delay)
                 return True  # <--- THIS IS THE KEY FIX: Exit the function on success
             else:
