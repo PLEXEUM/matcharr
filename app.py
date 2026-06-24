@@ -143,10 +143,9 @@ def main():
                 # Normalize both paths for comparison
                 normalized_plex_path = normalize_path(plex_path)
                 normalized_match_path = normalize_path(match_path)
-    
-                # Check if the paths match exactly at the end
-                # This prevents matching parent directories
-                if normalized_plex_path == normalized_match_path or normalized_plex_path.endswith('/' + normalized_match_path):
+                
+                # Check if the match path is contained in the Plex path
+                if normalized_match_path in normalized_plex_path:
                     plex_item = plex_data_item
                     break
             
@@ -206,10 +205,9 @@ def main():
                 # Normalize both paths for comparison
                 normalized_plex_path = normalize_path(plex_path)
                 normalized_match_path = normalize_path(match_path)
-    
-                # Check if the paths match exactly at the end
-                # This prevents matching parent directories
-                if normalized_plex_path == normalized_match_path or normalized_plex_path.endswith('/' + normalized_match_path):
+                
+                # Check if the match path is contained in the Plex path
+                if normalized_match_path in normalized_plex_path:
                     plex_item = plex_data_item
                     break
             
