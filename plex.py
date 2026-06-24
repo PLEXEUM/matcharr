@@ -65,7 +65,8 @@ def map_plex_paths(plex_data, sonarr_root, radarr_root, config):
 def fetch_plex_libraries(config):
     """
     Connect to Plex and fetch all movie and TV show libraries.
-    Auto-detects movie and TV sections by type and path.
+    Only loads sections that physically contain the root folders.
+    Fails if no matching sections are found.
     """
     server = PlexServer(config["plex_url"], config["plex_token"])
     sections = server.library.sections()
@@ -76,48 +77,48 @@ def fetch_plex_libraries(config):
     sonarr_root = normalize_path(config.get("sonarr_root_folder", ""))
     radarr_root = normalize_path(config.get("radarr_root_folder", ""))
     
+    # Track which sections were found
+    found_movie_section = False
+    found_tv_section = False
+    
     for section in sections:
         section_paths = [normalize_path(p) for p in section.locations]
         
         # Check if this section matches the movie root folder
-        is_movie_section = False
-        is_show_section = False
-        
         if section.type == "movie" and radarr_root:
-            # Check if any section path contains the radarr root
             for path in section_paths:
                 if radarr_root in path or path in radarr_root:
-                    is_movie_section = True
+                    logger.info(f"Auto-detected movie section: '{section.title}' (ID: {section.key})")
+                    result['movies'] = _load_plex_items(section, "movie")
+                    found_movie_section = True
                     break
-            # Fallback: if section title contains "Movie"
-            if not is_movie_section and "movie" in section.title.lower():
-                is_movie_section = True
         
+        # Check if this section matches the TV root folder
         if section.type == "show" and sonarr_root:
-            # Check if any section path contains the sonarr root
             for path in section_paths:
                 if sonarr_root in path or path in sonarr_root:
-                    is_show_section = True
+                    logger.info(f"Auto-detected TV section: '{section.title}' (ID: {section.key})")
+                    result['shows'] = _load_plex_items(section, "show")
+                    found_tv_section = True
                     break
-            # Fallback: if section title contains "TV" or "Show"
-            if not is_show_section and ("tv" in section.title.lower() or "show" in section.title.lower()):
-                is_show_section = True
-        
-        # Load items for matching sections
-        if is_movie_section:
-            logger.info(f"Auto-detected movie section: '{section.title}' (ID: {section.key})")
-            result['movies'] = _load_plex_items(section, "movie")
-        elif is_show_section:
-            logger.info(f"Auto-detected TV section: '{section.title}' (ID: {section.key})")
-            result['shows'] = _load_plex_items(section, "show")
-        else:
-            # Fallback: use type-based detection if no root matches
-            if section.type == "movie" and not result['movies']:
-                logger.info(f"Using movie section: '{section.title}' (ID: {section.key})")
-                result['movies'] = _load_plex_items(section, "movie")
-            elif section.type == "show" and not result['shows']:
-                logger.info(f"Using TV section: '{section.title}' (ID: {section.key})")
-                result['shows'] = _load_plex_items(section, "show")
+    
+    # Fail if movie section not found
+    if not found_movie_section:
+        logger.error(f"❌ No movie section found with root path: {radarr_root}")
+        logger.error(f"Available movie sections:")
+        for section in sections:
+            if section.type == "movie":
+                logger.error(f"  - '{section.title}' (ID: {section.key}) - Paths: {section.locations}")
+        raise Exception(f"Movie section not found for root: {radarr_root}")
+    
+    # Fail if TV section not found
+    if not found_tv_section:
+        logger.error(f"❌ No TV section found with root path: {sonarr_root}")
+        logger.error(f"Available TV sections:")
+        for section in sections:
+            if section.type == "show":
+                logger.error(f"  - '{section.title}' (ID: {section.key}) - Paths: {section.locations}")
+        raise Exception(f"TV section not found for root: {sonarr_root}")
     
     return result
 
