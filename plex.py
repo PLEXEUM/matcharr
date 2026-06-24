@@ -5,9 +5,12 @@ Simple functions to fetch Plex data and update metadata.
 import re
 import time
 import os
+import logging  # <-- ADD THIS LINE
 import requests
 from plexapi.server import PlexServer
 
+# <-- ADD THIS LINE AFTER IMPORTS -->
+logger = logging.getLogger(__name__)
 
 def normalize_path(path):
     """Normalize path for consistent comparison."""
@@ -148,8 +151,20 @@ def update_plex_match(config, rating_key, media_type, media_id, title, delay):
     params = {
         'X-Plex-Token': config['plex_token'],
         'guid': guid,
-        'title': title
+        'name': title  # <-- CHANGE 'title' TO 'name'
     }
+
+    # Add proper headers (from your working code)
+    headers = {
+        "Accept": "application/json",
+        "X-Plex-Product": "Matcharr",
+        "X-Plex-Client-Identifier": "matcharr-695b47f5-3c61-4cbd-8eb3-bcc3d6d06ac5",
+        "X-Plex-Version": "1.0.0",
+    }
+
+    # ===== ADD THIS DEBUG LINE HERE =====
+    logger.debug(f"Attempting to match '{title}' (RatingKey: {rating_key}, {agent_type} ID: {media_id}) - URL: {url}")
+    # ===== END DEBUG LINE =====
     
     for attempt in range(3):
         try:
@@ -161,6 +176,9 @@ def update_plex_match(config, rating_key, media_type, media_id, title, delay):
                 return True
             else:
                 print(f"✗ Failed to update {title}: {response.status_code} - {response.text}")
+                # Log the full request for debugging
+                logger.debug(f"PUT {url} with params: {params}")
+                logger.debug(f"Response: {response.status_code} - {response.text}")
                 return False
                 
         except Exception as e:
