@@ -171,23 +171,12 @@ def _load_plex_items(section, media_type):
 def update_plex_match(config, rating_key, media_type, media_id, title, delay):
     """
     Update a Plex item to use the correct TMDB or TVDB ID.
-    
-    Args:
-        config: Configuration dictionary
-        rating_key: Plex ratingKey of the item to update
-        media_type: 'movie' or 'show'
-        media_id: TMDB ID (for movies) or TVDB ID (for shows)
-        title: Title of the media (for logging)
-        delay: Seconds to wait after update
-    
-    Returns:
-        True if successful, False otherwise
     """
     if media_type == "movie":
-        guid = f"plex://movie/{media_id}?lang=en"
+        guid = f"tmdb://{media_id}?lang=en"
         agent_type = "TMDB"
     else:  # show
-        guid = f"plex://show/{media_id}?lang=en"
+        guid = f"tvdb://{media_id}?lang=en"
         agent_type = "TVDB"
     
     url = f"{config['plex_url']}/library/metadata/{rating_key}/match"
@@ -204,21 +193,23 @@ def update_plex_match(config, rating_key, media_type, media_id, title, delay):
         "X-Plex-Version": "1.0.0",
     }
 
-    logger.debug(f"Attempting to match '{title}' (RatingKey: {rating_key}, {agent_type} ID: {media_id}) - URL: {url}")
-    
-    try:
-        response = requests.put(url, params=params, headers=headers, timeout=30)
-        
-        if response.status_code == 200:
-            logger.info(f"✓ Updated {title} (RatingKey: {rating_key}) to {agent_type} ID: {media_id}")
+    retries = 5
+    while retries > 0:
+        try:
+            response = requests.put(url, params=params, headers=headers, timeout=30)
             
-            # Wait for Plex to process
+            if response.status_code == 200:
+                logger.info(f"✓ Updated {title} (RatingKey: {rating_key}) to {agent_type} ID: {media_id}")
+                time.sleep(delay)
+                return True
+            else:
+                logger.warning(f"✗ Failed to update {title}: {response.status_code} - {response.text}")
+                return False
+                
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectTimeout) as e:
+            retries -= 1
+            logger.warning(f"Timeout matching {title} ({agent_type} ID: {media_id}) - {retries} retries left")
             time.sleep(delay)
-            return True
-        else:
-            logger.warning(f"✗ Failed to update {title}: {response.status_code} - {response.text}")
-            return False
-            
-    except Exception as e:
-        logger.error(f"✗ Failed to update {title}: {e}")
-        return False
+    
+    logger.error(f"✗ Failed to update {title} after 5 attempts")
+    return False
