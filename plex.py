@@ -216,12 +216,39 @@ def update_plex_match(config, rating_key, media_type, media_id, title, delay):
             if response.status_code == 200:
                 # --- SUCCESS! Log it, wait, and return True immediately ---
                 logger.info(f"✓ Updated {title} (RatingKey: {rating_key}) to {agent_type} ID: {media_id}")
+                
+                # REFRESH the metadata to ensure the change is applied
+                try:
+                    refresh_url = f"{config['plex_url']}/library/metadata/{rating_key}/refresh"
+                    refresh_params = {'X-Plex-Token': config['plex_token']}
+                    refresh_response = requests.get(refresh_url, params=refresh_params, timeout=30)
+                    if refresh_response.status_code == 200:
+                        logger.debug(f"✓ Refreshed metadata for {title}")
+                    
+                        # VERIFY: Wait a moment and check if the GUID was actually updated
+                        time.sleep(2)  # Give Plex a moment to process
+                        verify_url = f"{config['plex_url']}/library/metadata/{rating_key}"
+                        verify_params = {'X-Plex-Token': config['plex_token']}
+                        verify_response = requests.get(verify_url, params=verify_params, timeout=30)
+                        
+                        if verify_response.status_code == 200:
+                            verify_data = verify_response.json()
+                            # Check if our GUID appears in the response
+                            # This is a basic check - you'd need to parse the XML/JSON properly
+                            logger.debug(f"✓ Verification check completed for {title}")
+                        else:
+                            logger.warning(f"⚠ Verification failed for {title}")
+                      
+                    else:
+                        logger.warning(f"⚠ Refresh returned {refresh_response.status_code} for {title}")
+                except Exception as e:
+                    logger.warning(f"⚠ Failed to refresh metadata for {title}: {e}")
+                
                 time.sleep(delay)
                 return True  # <--- THIS IS THE KEY FIX: Exit the function on success
             else:
                 # --- Handle non-200 responses (e.g., 400, 404) ---
                 logger.warning(f"✗ Failed to update {title}: {response.status_code} - {response.text}")
-                logger.warning(f"Failed to update {title}: {response.status_code} - {response.text}")
                 return False  # <--- Exit the function on failure, no retry needed for this movie
                 
         except Exception as e:

@@ -271,25 +271,33 @@ def main():
             else:
                 logger.warning(f"{timeoutput()} - WARNING: Failed to update show: {arr_title}")
     
-    # Print summary
+    # Print summary to console and log
     total_time = round(time.time() - start_time, 2)
     
-    print("\n" + "=" * 60)
-    print(f"{timeoutput()} - Matcharr Complete!")
-    print("=" * 60)
-    print("\nMOVIES:")
-    print(f"  Matched by path:     {stats['movies_matched']}")
-    print(f"  Already correct:     {stats['movies_already_correct']}")
-    print(f"  Updated:             {stats['movies_updated']}")
-    print(f"  Not found in Plex:   {stats['movies_not_found']}")
-    print("\nTV SHOWS:")
-    print(f"  Matched by path:     {stats['shows_matched']}")
-    print(f"  Already correct:     {stats['shows_already_correct']}")
-    print(f"  Updated:             {stats['shows_updated']}")
-    print(f"  Not found in Plex:   {stats['shows_not_found']}")
-    print("\n" + "=" * 60)
-    print(f"{timeoutput()} - Total execution time: {total_time} seconds")
-    print("=" * 60)
+    summary = "\n" + "=" * 60 + "\n"
+    summary += f"{timeoutput()} - Matcharr Complete!\n"
+    summary += "=" * 60 + "\n"
+    summary += "\nMOVIES:\n"
+    summary += f"  Matched by path:     {stats['movies_matched']}\n"
+    summary += f"  Already correct:     {stats['movies_already_correct']}\n"
+    summary += f"  Updated:             {stats['movies_updated']}\n"
+    summary += f"  Not found in Plex:   {stats['movies_not_found']}\n"
+    summary += "\nTV SHOWS:\n"
+    summary += f"  Matched by path:     {stats['shows_matched']}\n"
+    summary += f"  Already correct:     {stats['shows_already_correct']}\n"
+    summary += f"  Updated:             {stats['shows_updated']}\n"
+    summary += f"  Not found in Plex:   {stats['shows_not_found']}\n"
+    summary += "\n" + "=" * 60 + "\n"
+    summary += f"{timeoutput()} - Total execution time: {total_time} seconds\n"
+    summary += "=" * 60
+    
+    # Print to console
+    print(summary)
+    
+    # Log to file
+    for line in summary.split('\n'):
+        if line.strip():
+            logger.info(line)
     
     sys.exit(0)
 
