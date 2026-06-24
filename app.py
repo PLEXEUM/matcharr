@@ -169,6 +169,9 @@ def main():
                 stats['movies_not_found'] += 1
                 continue
             
+            # ADD THIS DEBUG: Log what IDs Plex currently has
+            logger.debug(f"Plex '{arr_title}' has TMDB IDs: {plex_item['tmdb_ids']}")
+
             # ADD THIS: Check if this Plex item was already processed
             rating_key = plex_item['ratingKey']
             if rating_key in processed_plex_items['movies']:
@@ -235,6 +238,9 @@ def main():
             if not plex_item:
                 stats['shows_not_found'] += 1
                 continue
+
+            # ADD THIS DEBUG: Log what IDs Plex currently has
+            logger.debug(f"Plex '{arr_title}' has TVDB IDs: {plex_item['tvdb_ids']}")
             
             # ADD THIS: Check if this Plex item was already processed
             rating_key = plex_item['ratingKey']
