@@ -16,8 +16,14 @@ def normalize_path(path):
     """Normalize path for consistent comparison."""
     if not path:
         return path
-    normalized = os.path.normpath(path).replace('\\', '/')
-    return normalized.rstrip('/')
+    # Convert backslashes to forward slashes
+    normalized = path.replace('\\', '/')
+    # Remove duplicate slashes (replace // with /)
+    while '//' in normalized:
+        normalized = normalized.replace('//', '/')
+    # Remove trailing slash
+    normalized = normalized.rstrip('/')
+    return normalized
 
 
 # ===== ADD THIS FUNCTION HERE =====
