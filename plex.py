@@ -184,20 +184,19 @@ def update_plex_match(config, rating_key, media_type, media_id, title, delay):
         True if successful, False otherwise
     """
     if media_type == "movie":
-        guid = f"tmdb://{media_id}?lang=en"
+        guid = f"plex://movie/{media_id}?lang=en"
         agent_type = "TMDB"
     else:  # show
-        guid = f"tvdb://{media_id}?lang=en"
+        guid = f"plex://show/{media_id}?lang=en"
         agent_type = "TVDB"
     
     url = f"{config['plex_url']}/library/metadata/{rating_key}/match"
     params = {
         'X-Plex-Token': config['plex_token'],
         'guid': guid,
-        'name': title  # <-- CHANGE 'title' TO 'name'
+        'name': title
     }
 
-    # Add proper headers (from your working code)
     headers = {
         "Accept": "application/json",
         "X-Plex-Product": "Matcharr",
@@ -205,58 +204,21 @@ def update_plex_match(config, rating_key, media_type, media_id, title, delay):
         "X-Plex-Version": "1.0.0",
     }
 
-    # ===== ADD THIS DEBUG LINE HERE =====
     logger.debug(f"Attempting to match '{title}' (RatingKey: {rating_key}, {agent_type} ID: {media_id}) - URL: {url}")
-    # ===== END DEBUG LINE =====
     
-    for attempt in range(3):
-        try:
-            response = requests.put(url, params=params, timeout=30)
+    try:
+        response = requests.put(url, params=params, headers=headers, timeout=30)
+        
+        if response.status_code == 200:
+            logger.info(f"✓ Updated {title} (RatingKey: {rating_key}) to {agent_type} ID: {media_id}")
             
-            if response.status_code == 200:
-                # --- SUCCESS! Log it, wait, and return True immediately ---
-                logger.info(f"✓ Updated {title} (RatingKey: {rating_key}) to {agent_type} ID: {media_id}")
-                
-                # REFRESH the metadata to ensure the change is applied
-                try:
-                    refresh_url = f"{config['plex_url']}/library/metadata/{rating_key}/refresh"
-                    refresh_params = {'X-Plex-Token': config['plex_token']}
-                    refresh_response = requests.get(refresh_url, params=refresh_params, timeout=30)
-                    if refresh_response.status_code == 200:
-                        logger.debug(f"✓ Refreshed metadata for {title}")
-                    
-                        # VERIFY: Wait a moment and check if the GUID was actually updated
-                        time.sleep(2)  # Give Plex a moment to process
-                        verify_url = f"{config['plex_url']}/library/metadata/{rating_key}"
-                        verify_params = {'X-Plex-Token': config['plex_token']}
-                        verify_response = requests.get(verify_url, params=verify_params, timeout=30)
-                        
-                        if verify_response.status_code == 200:
-                            verify_data = verify_response.json()
-                            # Check if our GUID appears in the response
-                            # This is a basic check - you'd need to parse the XML/JSON properly
-                            logger.debug(f"✓ Verification check completed for {title}")
-                        else:
-                            logger.warning(f"⚠ Verification failed for {title}")
-                      
-                    else:
-                        logger.warning(f"⚠ Refresh returned {refresh_response.status_code} for {title}")
-                except Exception as e:
-                    logger.warning(f"⚠ Failed to refresh metadata for {title}: {e}")
-                
-                time.sleep(delay)
-                return True  # <--- THIS IS THE KEY FIX: Exit the function on success
-            else:
-                # --- Handle non-200 responses (e.g., 400, 404) ---
-                logger.warning(f"✗ Failed to update {title}: {response.status_code} - {response.text}")
-                return False  # <--- Exit the function on failure, no retry needed for this movie
-                
-        except Exception as e:
-            # --- Handle network errors or timeouts ---
-            logger.error(f"Exception on attempt {attempt + 1} for {title}: {e}")
-            if attempt == 2:
-                logger.error(f"✗ Failed to update {title} after 3 attempts: {e}")
-                return False
-            time.sleep(2 ** attempt)  # Exponential backoff for network issues
-    
-    return False
+            # Wait for Plex to process
+            time.sleep(delay)
+            return True
+        else:
+            logger.warning(f"✗ Failed to update {title}: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"✗ Failed to update {title}: {e}")
+        return False
