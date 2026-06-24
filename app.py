@@ -144,12 +144,22 @@ def main():
                 normalized_plex_path = normalize_path(plex_path)
                 normalized_match_path = normalize_path(match_path)
                 
-                # Check if the match path is a directory in the Plex path
-                # Split paths into segments and check if match_path is a segment
-                plex_segments = normalized_plex_path.split('/')
+                # For movies, remove the filename from the plex path if it exists
+                # Split path into parts
+                plex_parts = normalized_plex_path.split('/')
+                
+                # Check if the last part contains a dot (likely a file with extension)
+                if len(plex_parts) > 0 and '.' in plex_parts[-1] and not plex_parts[-1].startswith('.'):
+                    # Remove the filename, keep only the directory path
+                    plex_path_for_matching = '/'.join(plex_parts[:-1])
+                else:
+                    plex_path_for_matching = normalized_plex_path
+                
+                # Split into segments for comparison
+                plex_segments = plex_path_for_matching.split('/')
                 match_segments = normalized_match_path.split('/')
                 
-                # Check if match_path segments match the end of plex_path segments
+                # Check if the last segments match (most specific match)
                 if len(match_segments) <= len(plex_segments):
                     if plex_segments[-len(match_segments):] == match_segments:
                         plex_item = plex_data_item
@@ -212,8 +222,7 @@ def main():
                 normalized_plex_path = normalize_path(plex_path)
                 normalized_match_path = normalize_path(match_path)
                 
-                # Check if the match path is a directory in the Plex path
-                # Split paths into segments and check if match_path is a segment
+                # Split into segments
                 plex_segments = normalized_plex_path.split('/')
                 match_segments = normalized_match_path.split('/')
                 
