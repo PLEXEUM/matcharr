@@ -144,10 +144,16 @@ def main():
                 normalized_plex_path = normalize_path(plex_path)
                 normalized_match_path = normalize_path(match_path)
                 
-                # Check if the match path is contained in the Plex path
-                if normalized_match_path in normalized_plex_path:
-                    plex_item = plex_data_item
-                    break
+                # Check if the match path is a directory in the Plex path
+                # Split paths into segments and check if match_path is a segment
+                plex_segments = normalized_plex_path.split('/')
+                match_segments = normalized_match_path.split('/')
+                
+                # Check if match_path segments match the end of plex_path segments
+                if len(match_segments) <= len(plex_segments):
+                    if plex_segments[-len(match_segments):] == match_segments:
+                        plex_item = plex_data_item
+                        break
             
             if not plex_item:
                 stats['movies_not_found'] += 1
@@ -206,10 +212,16 @@ def main():
                 normalized_plex_path = normalize_path(plex_path)
                 normalized_match_path = normalize_path(match_path)
                 
-                # Check if the match path is contained in the Plex path
-                if normalized_match_path in normalized_plex_path:
-                    plex_item = plex_data_item
-                    break
+                # Check if the match path is a directory in the Plex path
+                # Split paths into segments and check if match_path is a segment
+                plex_segments = normalized_plex_path.split('/')
+                match_segments = normalized_match_path.split('/')
+                
+                # Check if match_path segments match the end of plex_path segments
+                if len(match_segments) <= len(plex_segments):
+                    if plex_segments[-len(match_segments):] == match_segments:
+                        plex_item = plex_data_item
+                        break
             
             if not plex_item:
                 stats['shows_not_found'] += 1
