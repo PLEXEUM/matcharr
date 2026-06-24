@@ -173,10 +173,10 @@ def update_plex_match(config, rating_key, media_type, media_id, title, delay):
     Update a Plex item to use the correct TMDB or TVDB ID.
     """
     if media_type == "movie":
-        guid = f"tmdb://{media_id}?lang=en"
+        guid = f"com.plexapp.agents.themoviedb://{media_id}?lang=en"
         agent_type = "TMDB"
     else:  # show
-        guid = f"tvdb://{media_id}?lang=en"
+        guid = f"com.plexapp.agents.thetvdb://{media_id}?lang=en"
         agent_type = "TVDB"
     
     url = f"{config['plex_url']}/library/metadata/{rating_key}/match"
@@ -193,6 +193,8 @@ def update_plex_match(config, rating_key, media_type, media_id, title, delay):
         "X-Plex-Version": "1.0.0",
     }
 
+    logger.debug(f"Attempting to match '{title}' (RatingKey: {rating_key}, {agent_type} ID: {media_id}) - URL: {url}")
+    
     retries = 5
     while retries > 0:
         try:
