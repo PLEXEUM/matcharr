@@ -233,33 +233,3 @@ def update_plex_match(config, rating_key, media_type, media_id, title, delay):
             time.sleep(2 ** attempt)  # Exponential backoff for network issues
     
     return False
-
-
-def normalize_plex_paths(plex_data, config):
-    """
-    Apply path mappings from config to normalize Plex paths.
-    This allows matching if Sonarr/Radarr paths are different from Plex paths.
-    
-    Args:
-        plex_data: Dictionary from fetch_plex_libraries()
-        config: Configuration with path_mappings
-    
-    Returns:
-        Same structure but with mapped paths as keys
-    """
-    mapped_data = {'movies': {}, 'shows': {}}
-    
-    for media_type in ['movies', 'shows']:
-        for original_path, item_data in plex_data[media_type].items():
-            mapped_path = original_path
-            
-            # Apply path mappings
-            for source, dest in config.get('path_mappings', {}).items():
-                if original_path.startswith(source):
-                    mapped_path = original_path.replace(source, dest)
-                    break
-            
-            mapped_path = normalize_path(mapped_path)
-            mapped_data[media_type][mapped_path] = item_data
-    
-    return mapped_data

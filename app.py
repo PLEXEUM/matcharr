@@ -12,7 +12,7 @@ from tqdm import tqdm
 from datetime import datetime
 
 from arr import fetch_all_instances
-from plex import fetch_plex_libraries, normalize_plex_paths, update_plex_match, normalize_path, map_plex_paths  # <-- ADD map_plex_paths
+from plex import fetch_plex_libraries, update_plex_match, normalize_path, map_plex_paths
 
 # Create logs directory if it doesn't exist
 LOG_DIR = "/app/logs"
@@ -113,6 +113,12 @@ def main():
         'shows_already_correct': 0,
         'shows_not_found': 0
     }
+
+    # ADD THIS: Track which Plex items have already been processed in this run
+    processed_plex_items = {
+        'movies': set(),  # Store ratingKeys
+        'shows': set()
+    }
     
     # Process Radarr movies against Plex
     logger.info(f"{timeoutput()} - Processing movies...")
@@ -134,7 +140,13 @@ def main():
             # Find matching Plex movie by path (search in mapped paths)
             plex_item = None
             for plex_path, plex_data_item in plex_data_mapped['movies'].items():
-                if match_path in plex_path or plex_path.endswith(match_path):
+                # Normalize both paths for comparison
+                normalized_plex_path = normalize_path(plex_path)
+                normalized_match_path = normalize_path(match_path)
+    
+                # Check if the paths match exactly at the end
+                # This prevents matching parent directories
+                if normalized_plex_path == normalized_match_path or normalized_plex_path.endswith('/' + normalized_match_path):
                     plex_item = plex_data_item
                     break
             
@@ -142,6 +154,13 @@ def main():
                 stats['movies_not_found'] += 1
                 continue
             
+            # ADD THIS: Check if this Plex item was already processed
+            rating_key = plex_item['ratingKey']
+            if rating_key in processed_plex_items['movies']:
+                logger.debug(f"Skipping {arr_title}: Plex item already processed in this run")
+                continue
+            processed_plex_items['movies'].add(rating_key)
+
             stats['movies_matched'] += 1
             
             # Check if correct TMDB ID is already in Plex
@@ -184,13 +203,26 @@ def main():
             # Find matching Plex show by path (search in mapped paths)
             plex_item = None
             for plex_path, plex_data_item in plex_data_mapped['shows'].items():
-                if match_path in plex_path or plex_path.endswith(match_path):
+                # Normalize both paths for comparison
+                normalized_plex_path = normalize_path(plex_path)
+                normalized_match_path = normalize_path(match_path)
+    
+                # Check if the paths match exactly at the end
+                # This prevents matching parent directories
+                if normalized_plex_path == normalized_match_path or normalized_plex_path.endswith('/' + normalized_match_path):
                     plex_item = plex_data_item
                     break
             
             if not plex_item:
                 stats['shows_not_found'] += 1
                 continue
+            
+            # ADD THIS: Check if this Plex item was already processed
+            rating_key = plex_item['ratingKey']
+            if rating_key in processed_plex_items['shows']:
+                logger.debug(f"Skipping {arr_title}: Plex item already processed in this run")
+                continue
+            processed_plex_items['shows'].add(rating_key)
             
             stats['shows_matched'] += 1
             
