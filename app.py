@@ -168,9 +168,6 @@ def main():
             if not plex_item:
                 stats['movies_not_found'] += 1
                 continue
-            
-            # ADD THIS DEBUG: Log what IDs Plex currently has
-            logger.debug(f"Plex '{arr_title}' has TMDB IDs: {plex_item['tmdb_ids']}")
 
             # ADD THIS: Check if this Plex item was already processed
             rating_key = plex_item['ratingKey']
@@ -185,6 +182,9 @@ def main():
             if arr_id in plex_item['tmdb_ids']:
                 stats['movies_already_correct'] += 1
                 continue
+
+            # ADD THIS: Log mismatch with ID comparison
+            logger.info(f"MISMATCH: '{arr_title}' - Radarr ID: {arr_id} vs Plex IDs: {plex_item['tmdb_ids']}")
             
             # Update Plex with correct TMDB ID
             success = update_plex_match(
@@ -238,9 +238,6 @@ def main():
             if not plex_item:
                 stats['shows_not_found'] += 1
                 continue
-
-            # ADD THIS DEBUG: Log what IDs Plex currently has
-            logger.debug(f"Plex '{arr_title}' has TVDB IDs: {plex_item['tvdb_ids']}")
             
             # ADD THIS: Check if this Plex item was already processed
             rating_key = plex_item['ratingKey']
@@ -255,6 +252,9 @@ def main():
             if arr_id in plex_item['tvdb_ids']:
                 stats['shows_already_correct'] += 1
                 continue
+
+            # ADD THIS: Log mismatch with ID comparison
+            logger.info(f"MISMATCH: '{arr_title}' - Sonarr ID: {arr_id} vs Plex IDs: {plex_item['tvdb_ids']}")
             
             # Update Plex with correct TVDB ID
             success = update_plex_match(
