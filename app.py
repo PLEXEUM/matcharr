@@ -5,8 +5,9 @@ Matcharr - Compare Sonarr/Radarr data to Plex libraries and fix mismatches.
 import json
 import time
 import sys
-import logging  # <-- ADD THIS
+import logging
 import os
+import schedule
 from logging.handlers import RotatingFileHandler
 from tqdm import tqdm
 from datetime import datetime
@@ -31,6 +32,10 @@ logging.basicConfig(
         # NO StreamHandler - console stays clean!
     ]
 )
+# Get cron schedule from environment variable (default: daily at 2 AM)  # <-- NEW
+CRON_SCHEDULE = os.environ.get('CRON_SCHEDULE', '0 2 * * *')  # <-- NEW
+logger.info(f"Scheduled to run at: {CRON_SCHEDULE}")  # <-- NEW
+
 logger = logging.getLogger(__name__)
 
 
@@ -303,4 +308,49 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    from croniter import croniter
+    from datetime import datetime, timedelta
+
+    # Parse CRON_SCHEDULE and schedule accordingly
+    try:
+        # Validate the cron expression
+        croniter(CRON_SCHEDULE)
+        
+        # Get the next run time
+        base = datetime.now()
+        iter = croniter(CRON_SCHEDULE, base)
+        next_run = iter.get_next(datetime)
+        
+        # Schedule the job to run daily (schedule library limitation)
+        # We'll check every minute and run when the cron matches
+        logger.info(f"Scheduled to run at: {CRON_SCHEDULE}")
+        logger.info(f"Next run at: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+    except (ValueError, IndexError) as e:
+        logger.warning(f"Error parsing CRON_SCHEDULE '{CRON_SCHEDULE}': {e}. Using default: 02:00")
+        CRON_SCHEDULE = "0 2 * * *"
+    
+    # Keep the script running
+    logger.info("Matcharr is running in the background and will execute on schedule. Press Ctrl+C to stop.")
+    
+    # Custom cron checker
+    def should_run():
+        """Check if current time matches the cron schedule."""
+        try:
+            iter = croniter(CRON_SCHEDULE, datetime.now())
+            # Get the previous run time
+            prev = iter.get_prev(datetime)
+            # Check if it was within the last minute
+            return (datetime.now() - prev).seconds < 60
+        except:
+            return False
+
+    last_run = None
+    while True:
+        now = datetime.now()
+        if should_run() and (last_run is None or (now - last_run).seconds > 60):
+            # Prevent multiple runs in the same minute
+            last_run = now
+            logger.info(f"Triggering scheduled run at {now.strftime('%Y-%m-%d %H:%M:%S')}")
+            main()
+        time.sleep(60)  # Check every minute

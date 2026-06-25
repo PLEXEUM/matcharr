@@ -1,3 +1,5 @@
 requests>=2.28.0
 plexapi>=4.15.0
 tqdm>=4.65.0
+schedule>=1.2.0
+croniter>=1.4.0
