@@ -28,14 +28,16 @@ logging.basicConfig(
             maxBytes=52428800,  # 50MB
             backupCount=5
         ),
-        logging.StreamHandler()  # <-- ADD THIS to send logs to stdout/stderr
+        logging.StreamHandler()
     ]
 )
-# Get cron schedule from environment variable (default: daily at 2 AM)  # <-- NEW
-CRON_SCHEDULE = os.environ.get('CRON_SCHEDULE', '0 2 * * *')  # <-- NEW
-logger.info(f"Scheduled to run at: {CRON_SCHEDULE}")  # <-- NEW
 
+# Get logger instance FIRST (before using it)
 logger = logging.getLogger(__name__)
+
+# Get cron schedule from environment variable
+CRON_SCHEDULE = os.environ.get('CRON_SCHEDULE', '0 2 * * *')
+logger.info(f"Scheduled to run at: {CRON_SCHEDULE}")
 
 
 def timeoutput():
