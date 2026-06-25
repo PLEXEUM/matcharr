@@ -29,7 +29,7 @@ logging.basicConfig(
             maxBytes=52428800,  # 50MB
             backupCount=5
         )
-        # NO StreamHandler - console stays clean!
+        logging.StreamHandler()  # <-- ADD THIS to send logs to stdout/stderr
     ]
 )
 # Get cron schedule from environment variable (default: daily at 2 AM)  # <-- NEW
@@ -55,15 +55,15 @@ def main():
             config = json.load(f)
     except FileNotFoundError:
         logger.error(f"{timeoutput()} - ERROR: config.json not found")
-        sys.exit(1)
+        return
     except json.JSONDecodeError as e:
         logger.error(f"{timeoutput()} - ERROR: Invalid config.json: {e}")
-        sys.exit(1)
+        return
     
     # Validate config
     if not config.get("plex_url") or not config.get("plex_token"):
         logger.error(f"{timeoutput()} - ERROR: Plex URL and token are required")
-        sys.exit(1)
+        return
     
     # Get root folders from config (like Gaparr)
     sonarr_root = config.get("sonarr_root_folder", "")
@@ -71,7 +71,7 @@ def main():
     
     if not sonarr_root and not radarr_root:
         logger.error(f"{timeoutput()} - ERROR: sonarr_root_folder and/or radarr_root_folder are required")
-        sys.exit(1)
+        return
     
     # Fetch data from Sonarr and Radarr
     logger.info(f"{timeoutput()} - Fetching data from Sonarr and Radarr...")
@@ -278,7 +278,7 @@ def main():
     
     # Print summary to console and log
     total_time = round(time.time() - start_time, 2)
-    
+
     summary = "\n" + "=" * 60 + "\n"
     summary += f"{timeoutput()} - Matcharr Complete!\n"
     summary += "=" * 60 + "\n"
@@ -295,16 +295,16 @@ def main():
     summary += "\n" + "=" * 60 + "\n"
     summary += f"{timeoutput()} - Total execution time: {total_time} seconds\n"
     summary += "=" * 60
-    
+
     # Print to console
     print(summary)
-    
+
     # Log to file
     for line in summary.split('\n'):
         if line.strip():
             logger.info(line)
-    
-    sys.exit(0)
+
+    return  # <-- CHANGE THIS FROM sys.exit(0)
 
 
 if __name__ == "__main__":
