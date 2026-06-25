@@ -7,7 +7,7 @@ import time
 import sys
 import logging
 import os
-from logging.handlers import RotatingFileHandler
+from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from tqdm import tqdm
 from datetime import datetime
 
@@ -23,10 +23,10 @@ logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        RotatingFileHandler(
+        TimedRotatingFileHandler(
             os.path.join(LOG_DIR, "matcharr.log"),
-            maxBytes=52428800,  # 50MB
-            backupCount=5
+            when="midnight",  # Rotate daily at midnight
+            backupCount=5      # Keep 5 days
         ),
         logging.StreamHandler()
     ]
