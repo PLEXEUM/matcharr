@@ -7,7 +7,6 @@ import time
 import sys
 import logging
 import os
-import schedule
 from logging.handlers import RotatingFileHandler
 from tqdm import tqdm
 from datetime import datetime
@@ -94,7 +93,7 @@ def main():
     
     if total_sonarr == 0 and total_radarr == 0:
         logger.info(f"{timeoutput()} - No data found in Sonarr or Radarr. Exiting.")
-        sys.exit(0)
+        return
     
     # Fetch data from Plex
     logger.info(f"{timeoutput()} - Fetching data from Plex...")
