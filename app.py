@@ -27,7 +27,7 @@ logging.basicConfig(
             os.path.join(LOG_DIR, "matcharr.log"),
             maxBytes=52428800,  # 50MB
             backupCount=5
-        )
+        ),
         logging.StreamHandler()  # <-- ADD THIS to send logs to stdout/stderr
     ]
 )
